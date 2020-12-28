@@ -2,16 +2,14 @@
 https://github.com/mashirozx/Pixiv-Nginx
 
 提前说明一下,不同地区策略不同, 不保证一定能用,不保证一直可用,不支持登陆帐号,只能简单浏览
-先测试一下是否可以访问这个网站,能上应该就可行,浏览器警告隐私错误是正常的
-https://www.livehub.com
-
+先测试一下是否可以访问这个网站https://www.livehub.com, 能上应该就可行,浏览器警告隐私错误是正常的
 
 运行要求
 .NETFramework v4.7.2以上
 
 
 运行步骤
-1.(最重要的)需要手动修改hosts文件,添加如下几项,WIN10可能需要刷新DNSClient服务才会生效,在cmd中运行引号中的命令"ipconfig /flushdns"
+1.(最重要的)需要手动修改hosts文件,添加如下几项(WIN10可能需要刷新DNSClient服务才会生效,在cmd中运行引号中的命令"ipconfig /flushdns")
 
 127.0.0.1 cn.pornhub.com
 
@@ -23,8 +21,8 @@ https://www.livehub.com
 
 3.运行文件夹中的PornhubProxy.exe
 
-4.在浏览器中访问下面的链接,注意是HTTPS
-https://cn.pornhub.com/
+4.在浏览器中访问链接(注意是HTTPS) https://cn.pornhub.com/
+
 
 代码写的很糟糕,所以简单的说一下原理
 
