@@ -7,7 +7,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LeiKaiFeng.Http", "LeiKaiFe
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Pornhub", "Pornhub\Pornhub.csproj", "{04A2D110-A3A4-49FD-9792-BEA0DDB5C3B8}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PornhubProxy", "PornhubProxy\PornhubProxy.csproj", "{49CBE7E2-F027-4314-84D4-825618D3FB7F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PornhubProxy", "PornhubProxy\PornhubProxy.csproj", "{13A3B76E-993F-4131-88EA-ED0BFB570868}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -23,10 +23,10 @@ Global
 		{04A2D110-A3A4-49FD-9792-BEA0DDB5C3B8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{04A2D110-A3A4-49FD-9792-BEA0DDB5C3B8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{04A2D110-A3A4-49FD-9792-BEA0DDB5C3B8}.Release|Any CPU.Build.0 = Release|Any CPU
-		{49CBE7E2-F027-4314-84D4-825618D3FB7F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{49CBE7E2-F027-4314-84D4-825618D3FB7F}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{49CBE7E2-F027-4314-84D4-825618D3FB7F}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{49CBE7E2-F027-4314-84D4-825618D3FB7F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{13A3B76E-993F-4131-88EA-ED0BFB570868}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{13A3B76E-993F-4131-88EA-ED0BFB570868}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{13A3B76E-993F-4131-88EA-ED0BFB570868}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{13A3B76E-993F-4131-88EA-ED0BFB570868}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
