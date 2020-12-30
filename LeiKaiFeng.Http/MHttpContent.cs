@@ -150,7 +150,7 @@ namespace LeiKaiFeng.Http
                 }
                 else
                 {
-                    throw new FormatException("内容编码不支持");
+                    throw new MHttpException("内容编码不支持");
                 }
             }
             else

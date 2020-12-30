@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
 using System.Text;
@@ -7,34 +8,44 @@ using System.Threading.Tasks;
 namespace LeiKaiFeng.Http
 {
 
-
     //从索引0-UsedOffset是没有使用的字节数
     //从索引UsedOffset-ReadOffset是已经读取的字节数
     //从索引ReadOffset-MaxOffset是可以读取的字节数
     //没有实现为一个环形缓冲区，但会将已经读取的字节左移
 
-    public sealed class MHttpStream
+    public sealed partial class MHttpStream
     {
-        public static async Task<T> CreateTimeOutTaskAsync<T>(Task<T> task, TimeSpan timeSpan, Action timeOutAction, Action completedAction)
+        public static async Task<T> CreateTimeOutTaskAsync<T>(Task<T> task, TimeSpan timeSpan, Action timeOutAction, Action completedAction, Action exceptionAction)
         {
 
             Task t = await Task.WhenAny(task, Task.Delay(timeSpan)).ConfigureAwait(false);
 
-            if (object.ReferenceEquals(t, task))
+            try
             {
+                if (object.ReferenceEquals(t, task))
+                {
 
-                T value = await task.ConfigureAwait(false);
+                    T value = await task.ConfigureAwait(false);
 
-                completedAction();
+                    completedAction();
 
-                return value;
+                    return value;
+                }
+                else
+                {
+                    timeOutAction();
+
+                    return await task.ConfigureAwait(false);
+                }
             }
-            else
+            catch
             {
-                timeOutAction();
-
-                return await task.ConfigureAwait(false);
+                exceptionAction();
+              
+                throw;
             }
+
+            
         }
 
 
@@ -80,7 +91,7 @@ namespace LeiKaiFeng.Http
 
             if (used_size >= SIZE)
             {
-                throw new ArgumentOutOfRangeException("无法在有限的缓冲区中找到协议的边界，请增大缓冲区重试");
+                throw new MHttpException("无法在有限的缓冲区中找到协议的边界，请增大缓冲区重试");
             }
             else
             {
@@ -137,7 +148,7 @@ namespace LeiKaiFeng.Http
 
                 if (length < 0)
                 {
-                    throw new ArgumentOutOfRangeException("Chunked Length Is 0");
+                    throw new MHttpException("Chunked Length Is 0");
                 }
                 else
                 {
@@ -217,7 +228,7 @@ namespace LeiKaiFeng.Http
 
             if (!Pf.EndWith(buffer, checked((int)stream.Position), s_mark))
             {
-                throw new FormatException("Chunked数据的结尾标记错误");
+                throw new MHttpException("Chunked数据的结尾标记错误");
             }
         }
 
@@ -317,7 +328,7 @@ namespace LeiKaiFeng.Http
 
                 if(memoryStream.Position > maxContentSize)
                 {
-                    throw new ArgumentOutOfRangeException();
+                    throw new MHttpException("内容长度大于限制长度");
                 }
             }
         }
@@ -326,7 +337,7 @@ namespace LeiKaiFeng.Http
         {
             if (length > maxContentSize)
             {
-                throw new ArgumentOutOfRangeException("内容长度大于限制长度");
+                throw new MHttpException("内容长度大于限制长度");
             }
             else if (length == 0)
             {
@@ -358,7 +369,7 @@ namespace LeiKaiFeng.Http
                     
                     if (sumLength > maxContentSize)
                     {
-                        throw new ArgumentOutOfRangeException("内容长度大于限制长度");
+                        throw new MHttpException("内容长度大于限制长度");
                     }
 
 
@@ -381,23 +392,23 @@ namespace LeiKaiFeng.Http
             }
         }
 
-        public Task WriteAsync(byte[] buffer)
+        internal Task WriteAsync(byte[] buffer)
         {
             return this.WriteAsync(buffer, 0, buffer.Length);
         }
 
-        public Task WriteAsync(byte[] buffer, int offset, int size)
+        internal Task WriteAsync(byte[] buffer, int offset, int size)
         {
             return m_stream.WriteAsync(buffer, offset, size);
         }
 
-        public Task<int> ReadAsync(byte[] buffer)
+        internal Task<int> ReadAsync(byte[] buffer)
         {
             return this.ReadAsync(buffer, 0, buffer.Length);
         }
 
-       
-        public Task<int> ReadAsync(byte[] buffer, int offset, int size)
+
+        internal Task<int> ReadAsync(byte[] buffer, int offset, int size)
         {
 
             if (CanUsedSize == 0)
@@ -410,12 +421,131 @@ namespace LeiKaiFeng.Http
             }
         }
 
+        private bool m_is_close_socket = false;
+
+        private void CloseSocket()
+        {
+            if (m_is_close_socket == false) 
+            {
+                m_is_close_socket = true;
+
+                m_socket.Close();
+            }
+        }
 
         public void Close()
         {
-            m_socket.Close();
+            CloseSocket();
+
+            m_stream.Close();
+        }
+
+        public void Cancel()
+        {
+            CloseSocket();
         }
     }
+
+    public sealed partial class MHttpStream
+    {
+        static string ParseOneLine(string headers, ref int offset)
+        {
+            const string c_mark = "\r\n";
+
+            int index = headers.IndexOf(c_mark, offset, StringComparison.OrdinalIgnoreCase);
+
+            if (index == -1)
+            {
+                throw new MHttpException("解析HTTP头出错");
+            }
+            else
+            {
+                string s = headers.Substring(offset, index - offset);
+
+                offset = index + c_mark.Length;
+
+                return s;
+            }
+
+        }
+
+        static KeyValuePair<string, string> ParseKeyValue(string s)
+        {
+            const string c_mark = ":";
+
+            int index = s.IndexOf(c_mark, StringComparison.OrdinalIgnoreCase);
+
+            if (index == -1)
+            {
+                throw new MHttpException("解析HTTP头出错");
+            }
+            else
+            {
+                string key = s.Substring(0, index).Trim();
+
+                string value = s.Substring(index + c_mark.Length).Trim();
+
+                return new KeyValuePair<string, string>(key, value);
+            }
+        }
+
+        internal static KeyValuePair<string, MHttpHeaders> ParseLine(ArraySegment<byte> buffer)
+        {
+            string headers = Encoding.UTF8.GetString(buffer.Array, buffer.Offset, buffer.Count);
+
+            int offset = 0;
+
+            string first_line = ParseOneLine(headers, ref offset);
+
+
+            var dic = new MHttpHeaders();
+
+            while (true)
+            {
+                string s = ParseOneLine(headers, ref offset);
+
+                if (s.Length == 0)
+                {
+                    return new KeyValuePair<string, MHttpHeaders>(first_line, dic);
+                }
+                else
+                {
+                    var keyValue = ParseKeyValue(s);
+
+                    dic.Set(keyValue.Key, keyValue.Value);
+                }
+
+            }
+
+
+        }
+
+
+        internal static byte[] EncodeHeaders(string firstLine, Dictionary<string, string> headers)
+        {
+            const string c_mark = "\r\n";
+
+            StringBuilder sb = new StringBuilder(2048);
+
+            sb.Append(firstLine).Append(c_mark);
+
+            foreach (var item in headers)
+            {
+                sb.Append(item.Key).Append(": ").Append(item.Value).Append(c_mark);
+            }
+
+            sb.Append(c_mark);
+
+            string s = sb.ToString();
+
+            return Encoding.UTF8.GetBytes(s);
+        }
+
+        
+
+    }
+
+
 
     static class Pf
     {

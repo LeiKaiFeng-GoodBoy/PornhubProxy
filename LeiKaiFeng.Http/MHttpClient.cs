@@ -60,7 +60,8 @@ namespace LeiKaiFeng.Http
                 CreateNewConnectAsync(socket, uri),
                 ConnectTimeOut,
                 socket.Close,
-                () => { }).ConfigureAwait(false);
+                () => { },
+                socket.Close).ConfigureAwait(false);
 
             return new MHttpStream(socket, stream);
         }
@@ -72,8 +73,9 @@ namespace LeiKaiFeng.Http
             return MHttpStream.CreateTimeOutTaskAsync(
                 Internal_SendAsync(request, stream),
                 ResponseTimeOut,
-                stream.Close,
-                () => m_pool.Set(uri, stream));
+                stream.Cancel,
+                () => m_pool.Set(uri, stream),
+                stream.Close);
         }
 
 

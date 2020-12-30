@@ -82,7 +82,7 @@ namespace LeiKaiFeng.Http
         {
             if(length < 0)
             {
-                throw new ArgumentOutOfRangeException();
+                throw new MHttpException("设置内容长度超出范围");
             }
 
             this.Headers[MHttpHeadersKey.ContentLength] = length.ToString();
@@ -94,7 +94,7 @@ namespace LeiKaiFeng.Http
 
             if (n < 0)
             {
-                throw new ArgumentOutOfRangeException();
+                throw new MHttpException("获取内容长度超出范围");
             }
             else
             {

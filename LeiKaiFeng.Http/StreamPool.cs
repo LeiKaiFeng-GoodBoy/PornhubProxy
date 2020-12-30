@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 
 namespace LeiKaiFeng.Http
 {
@@ -69,49 +70,93 @@ namespace LeiKaiFeng.Http
             }
         }
 
+        sealed class Deque
+        {
+            readonly object m_lock = new object();
+
+            readonly LinkedList<MHttpStream> m_list;
+
+            readonly int m_maxCount;
+
+            public Deque(int maxCount)
+            {
+                m_maxCount = maxCount;
+
+                m_list = new LinkedList<MHttpStream>();
+            }
 
 
-        readonly ConcurrentDictionary<HostKey, ConcurrentQueue<MHttpStream>> m_pool = new ConcurrentDictionary<HostKey, ConcurrentQueue<MHttpStream>>();
+            public MHttpStream Add(MHttpStream stream)
+            {
+                lock (m_lock)
+                {
+                    m_list.AddFirst(stream);
 
-        readonly int m_maxCount;
+                    if (m_list.Count >= m_maxCount)
+                    {
+                        var v = m_list.Last.Value;
+
+                        m_list.RemoveLast();
+
+                        return v;
+                    }
+                    else
+                    {
+                        return null;
+                    }
+                    
+                }
+            }
+
+            public MHttpStream Get()
+            {
+                lock (m_lock)
+                {
+                    var node = m_list.First;
+
+                    if (node is null)
+                    {
+                        return null;
+                    }
+                    else
+                    {
+                        var stream = node.Value;
+
+                        m_list.RemoveFirst();
+
+                        return stream;
+                    }
+                }
+            }
+        }
+
+        readonly ConcurrentDictionary<HostKey, Deque> m_pool = new ConcurrentDictionary<HostKey, Deque>();
+
+        readonly Func<HostKey, Deque> m_create;
 
         public StreamPool(int maxCount)
         {
-            m_maxCount = maxCount;
+            m_create = (k) => new Deque(maxCount);
         }
 
-        ConcurrentQueue<MHttpStream> Find(Uri uri)
+     
+        Deque Find(Uri uri)
         {
-            return m_pool.GetOrAdd(new HostKey(uri), (k) => new ConcurrentQueue<MHttpStream>());
+            return m_pool.GetOrAdd(new HostKey(uri), m_create);
         }
 
         public MHttpStream Get(Uri uri)
         {
-            var queue = Find(uri);
+            var deque = Find(uri);
 
-            if (queue.TryDequeue(out var v))
-            {
-                return v;
-            }
-            else
-            {
-                return null;
-            }
+            return deque.Get();
         }
 
         public void Set(Uri uri, MHttpStream stream)
         {
-           
+            var deque = Find(uri);
 
-            var queue = Find(uri);
-
-
-            while (queue.Count > m_maxCount && queue.TryDequeue(out _))
-            {
-
-            }
-
-            queue.Enqueue(stream);
+            deque.Add(stream)?.Close();
         }
     }
 }

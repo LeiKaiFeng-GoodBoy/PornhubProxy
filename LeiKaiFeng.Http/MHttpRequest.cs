@@ -6,28 +6,21 @@ using System.Linq;
 
 namespace LeiKaiFeng.Http
 {
-    public sealed class MHttpRequest
+    public sealed class MHttpRequest : MHttpMessage
     {
         public string Method { get; private set; }
 
         public string Path { get; private set; }
 
-        public MHttpHeaders Headers { get; private set; }
-
-        public MHttpContent Content { get; private set; }
-
-        private MHttpRequest(string method, string path, MHttpHeaders headers)
+        private MHttpRequest(string method, string path, MHttpHeaders headers) : base(headers, new MHttpContent())
         {
             Method = method;
 
             Path = path;
 
-            Headers = headers;
-
-            Content = new MHttpContent();
         }
 
-        static KeyValuePair<string, string> ParseMethodUri(string firstLine)
+        static KeyValuePair<string, string> ParseRequestMethodPath(string firstLine)
         {
             string[] ss = firstLine.Split(new char[] { ' ' }, 3, StringSplitOptions.RemoveEmptyEntries);
 
@@ -35,12 +28,12 @@ namespace LeiKaiFeng.Http
         }
 
 
-        static MHttpRequest Create(ArraySegment<byte> buffer)
+        static MHttpRequest CreateMHttpRequest(ArraySegment<byte> buffer)
         {
 
-            var firstDic = MHttpParse.ParseLine(buffer);
+            var firstDic = MHttpStream.ParseLine(buffer);
 
-            var mu = ParseMethodUri(firstDic.Key);
+            var mu = ParseRequestMethodPath(firstDic.Key);
 
             return new MHttpRequest(mu.Key, mu.Value, firstDic.Value);
         }
@@ -70,21 +63,7 @@ namespace LeiKaiFeng.Http
             return request;
         }
 
-        public void SetContent(string s)
-        {
-            SetContent(Encoding.UTF8.GetBytes(s));
-        }
-
-
-        public void SetContent(byte[] array)
-        {
-            Headers.SetContentLength(array.Length);
-
-            Headers.RemoveContentEncoding();
-
-            Content.SetByteArray(array);
-        }
-
+        
 
         Task ReadContentAsync(MHttpStream stream, int maxContentSize)
         {
@@ -98,14 +77,10 @@ namespace LeiKaiFeng.Http
             }
         }
 
-        internal static Task<MHttpRequest> ReadHeadersAsync(MHttpStream stream)
-        {
-            return stream.ReadHeadersAsync(Create);
-        }
-
+        
         public static async Task<MHttpRequest> ReadAsync(MHttpStream stream, int maxContentSize)
         {
-            MHttpRequest request = await ReadHeadersAsync(stream).ConfigureAwait(false);
+            MHttpRequest request = await stream.ReadHeadersAsync(CreateMHttpRequest).ConfigureAwait(false);
 
             await request.ReadContentAsync(stream, maxContentSize).ConfigureAwait(false);
 
@@ -121,7 +96,7 @@ namespace LeiKaiFeng.Http
         {
             string firstLine = $"{Method} {Path} HTTP/1.1";
          
-            return MHttpCreate.EncodeHeaders(firstLine, Headers.Headers);
+            return MHttpStream.EncodeHeaders(firstLine, Headers.Headers);
 
         }
 
