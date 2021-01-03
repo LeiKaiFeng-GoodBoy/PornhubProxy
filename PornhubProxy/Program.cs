@@ -14,34 +14,164 @@ using System.Threading;
 using System.Threading.Tasks;
 using LeiKaiFeng.Http;
 using Pornhub;
+using System.Runtime.InteropServices;
+using Microsoft.Win32;
 
 namespace PornhubProxy
 {
 
-
-
-    public static class Source
+    public static class SetProxy
     {
-        public const string PFX_BASE64_TEXT = "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";
 
-        public const string PAC_TEXT = @"function FindProxyForURL(url, host) {
-                if(host === 'cn.pornhub.com' ||
-                    host === 'hubt.pornhub.com'){
-	                return 'PROXY 127.0.0.1:8848';
-                }
-                else 
-                if(host === 'cv-h.phncdn.com' ||
-                    host === 'cv.phncdn.com' ||
-                    host === 'www.pornhub.com'){
+        [DllImport("wininet.dll")]
+        static extern bool InternetSetOption(IntPtr hInternet, int dwOption, IntPtr lpBuffer, int dwBufferLength);
+        const int INTERNET_OPTION_SETTINGS_CHANGED = 39;
+        const int INTERNET_OPTION_REFRESH = 37;
+     
+        static void FlushOs()
+        {
+            InternetSetOption(IntPtr.Zero, INTERNET_OPTION_SETTINGS_CHANGED, IntPtr.Zero, 0);
+          
+            InternetSetOption(IntPtr.Zero, INTERNET_OPTION_REFRESH, IntPtr.Zero, 0);
+        }
 
-                    return 'PROXY 127.0.0.1:80';
-                }
-                else{
-	                return 'DIRECT';
-                }
-            }";
+        static RegistryKey OpenKey()
+        {
+            return Registry.CurrentUser.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings", true);
+        }
 
-        public const string PAC_CONTENT_TYPE = "application/x-ns-proxy-autoconfig";
+        public static void Set(Uri uri)
+        {
+            RegistryKey registryKey = OpenKey();
+            
+            registryKey.SetValue("AutoConfigURL", uri.AbsoluteUri);
+
+            FlushOs();
+        }
+
+    }
+
+
+    sealed class PacServer
+    {
+        const string PAC_CONTENT_TYPE = "application/x-ns-proxy-autoconfig";
+
+        static string CreateIf(string p, string[] hosts)
+        {
+
+            bool b1 = Regex.IsMatch(p, @"^[a-zA-Z_][a-zA-Z0-9_]*$");
+
+            if (b1 == false)
+            {
+                throw new ArgumentException("p form exception");
+            }
+
+            bool b2 = hosts.All((s) => Regex.IsMatch(s, @"^[a-zA-Z0-9\.]+$"));
+
+
+            if (b2 == false)
+            {
+                throw new ArgumentException("host form exception");
+            }
+
+            return string.Join(" || ", hosts.Select(s => $"{p} === '{s}'"));
+        }
+
+        static string CreateIfBlack(string s, IPEndPoint endPoint)
+        {
+            return $"if({s}) return 'PROXY {endPoint.Address}:{endPoint.Port}';";
+        }
+
+        static string CreateAll(string p, (string[] hosts, IPEndPoint endPoint)[] values)
+        {
+            StringBuilder sb = new StringBuilder();
+
+            foreach (var item in values)
+            {
+                string s = CreateIf(p, item.hosts);
+
+
+
+                sb.Append(CreateIfBlack(s, item.endPoint));
+            }
+
+
+            return sb.ToString();
+        }
+
+        static string CreatePac((string[] hosts, IPEndPoint endPoint)[] values)
+        {
+            const string P = "host";
+
+            string s = $"function FindProxyForURL(url, {P})" + "{" + CreateAll(P, values) + "return 'DIRECT';}";
+
+            return s;
+        }
+
+        static Task ReadRequestAsync(Socket socket)
+        {
+            byte[] buffer = new byte[1024];
+
+            return socket.ReceiveAsync(new ArraySegment<byte>(buffer), SocketFlags.None);
+        }
+
+
+        static async Task RequestAsync(Socket socket, byte[] buffer)
+        {
+           
+            try
+            {
+                await ReadRequestAsync(socket).ConfigureAwait(false);
+
+                await socket.SendAsync(new ArraySegment<byte>(buffer), SocketFlags.None).ConfigureAwait(false);
+
+                socket.Shutdown(SocketShutdown.Both);
+            }
+            catch (SocketException)
+            {
+
+            }
+            finally
+            {
+                socket.Close();
+            }
+        }
+
+        static async Task While(Socket socket, byte[] buffer)
+        {
+            while (true)
+            {
+
+                Socket client = await socket.AcceptAsync().ConfigureAwait(false);
+         
+                Task t = Task.Run(() => RequestAsync(client, buffer));
+            }
+        }
+
+        public static (string[] hosts, IPEndPoint endPoint) Create(IPEndPoint endPoint, params string[] hosts)
+        {
+            return (hosts, endPoint);
+        }
+
+        public static Uri Start(IPEndPoint server, params (string[] hosts, IPEndPoint endPoint)[] values)
+        {
+            Uri uri = new Uri($"http://{server.Address}:{server.Port}/proxy.pac");
+
+            string s = CreatePac(values);
+
+            byte[] buffer = Encoding.UTF8.GetBytes($"HTTP/1.1 200 OK\r\nContent-Length: {Encoding.UTF8.GetBytes(s)}\r\nContent-Type: {PAC_CONTENT_TYPE}\r\n\r\n{s}");
+         
+            Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+            socket.Bind(server);
+
+            socket.Listen(6);
+
+            Task.Run(() => While(socket, buffer));
+
+            return uri;
+        }
+
     }
 
     static class Connect
@@ -78,7 +208,7 @@ namespace PornhubProxy
             Stream stream = new NetworkStream(socket, true);
 
 
-            //await Init(stream).ConfigureAwait(false);
+            await Init(stream).ConfigureAwait(false);
 
 
 
@@ -95,10 +225,48 @@ namespace PornhubProxy
     class Program
     {
         
+        public static void Run(IPEndPoint endPoint)
+        {
+
+            Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+
+            socket.Bind(endPoint);
+
+            socket.Listen(6);
+
+            while (true)
+            {
+                
+                socket.Accept();
+
+                Console.WriteLine("0");
+            }
+
+        }
+
         static void Main(string[] args)
         {
+
+
+
+            const string PFX_BASE64_TEXT = "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";
+
+
+            //AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException;
+
+            IPEndPoint endPoint = new IPEndPoint(IPAddress.Loopback, 1080);
+
+            Uri uri = PacServer.Start(new IPEndPoint(IPAddress.Loopback, 8080),
+                PacServer.Create(endPoint, "cn.pornhub.com"),
+                PacServer.Create(new IPEndPoint(IPAddress.Parse("127.0.0.1"), 80), "www.pornhub.com", "hubt.pornhub.com"));
+
+            SetProxy.Set(uri);
+
+            //Run(endPoint);
+       
             PornhubProxyServer server = new PornhubProxyServer(
-                Convert.FromBase64String(Source.PFX_BASE64_TEXT),
+                Convert.FromBase64String(PFX_BASE64_TEXT),
                 Connect.CreateRemoteStream,
                 Connect.CreateLocalStream,
                 1024 * 1024 * 5,
@@ -109,7 +277,7 @@ namespace PornhubProxy
             Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 
 
-            socket.Bind(new IPEndPoint(IPAddress.Loopback, 443));
+            socket.Bind(endPoint);
 
             socket.Listen(6);
 
@@ -118,6 +286,12 @@ namespace PornhubProxy
             {
                 server.Add(socket.Accept());
             }
+        }
+
+        private static void CurrentDomain_FirstChanceException(object sender, System.Runtime.ExceptionServices.FirstChanceExceptionEventArgs e)
+        {
+            string s = Environment.NewLine;
+            Console.WriteLine($"{s}{s}{e.Exception}{s}{s}");
         }
     }
 }
