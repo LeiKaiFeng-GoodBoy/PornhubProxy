@@ -7,23 +7,11 @@ https://github.com/mashirozx/Pixiv-Nginx
 运行要求
 .NETFramework v4.7.2以上
 
+1.(可选)将文件夹中的myCA.crt导入到系统受信任的根证书列表,是受信任的根证书列表,是受信任的根证书列表,这一步是避免浏览器隐私警告,只有Chrome有效,Firefox不管用,所以不导入也可以用,只不过需要忽略浏览器警告
 
-运行步骤
-1.(最重要的)需要手动修改hosts文件,添加如下几项(WIN10可能需要刷新DNSClient服务才会生效,在cmd中运行引号中的命令"ipconfig /flushdns")
+2.运行文件夹中的PornhubProxy.exe
 
-127.0.0.1 cn.pornhub.com
-
-127.0.0.5 www.pornhub.com
-
-127.0.0.1 hubt.pornhub.com
-
-
-
-2.(可选)将文件夹中的myCA.crt导入到系统受信任的根证书列表,是受信任的根证书列表,是受信任的根证书列表,这一步是避免浏览器隐私警告,只有Chrome有效,Firefox不管用,所以不导入也可以用,只不过需要忽略浏览器警告
-
-3.运行文件夹中的PornhubProxy.exe
-
-4.在浏览器中访问链接(注意是HTTPS) https://cn.pornhub.com/
+3.在浏览器中访问链接(注意是HTTPS) https://cn.pornhub.com/
 
 
 代码写的很糟糕,所以简单的说一下原理
