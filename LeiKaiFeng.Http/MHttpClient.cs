@@ -124,7 +124,7 @@ namespace LeiKaiFeng.Http
             }
             else
             {
-                throw new FormatException("无效响应");
+                throw new FormatException($"无效响应{n}");
             }
         }
 
