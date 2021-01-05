@@ -5,6 +5,17 @@ using System.Threading.Tasks;
 
 namespace LeiKaiFeng.Http
 {
+    [Serializable]
+    public sealed class MHttpResponseException : Exception
+    {
+        public int Status { get; private set; }
+
+        public MHttpResponseException(int status)
+        {
+            Status = status;
+        }
+    }
+
     public sealed class MHttpClient
     {
         readonly StreamPool m_pool;
@@ -124,7 +135,7 @@ namespace LeiKaiFeng.Http
             }
             else
             {
-                throw new FormatException($"无效响应{n}");
+                throw new MHttpResponseException(n);
             }
         }
 
