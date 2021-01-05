@@ -51,16 +51,12 @@ namespace Pornhub
 
         readonly MyChannels<RequestPack> m_channels;
 
-        readonly int m_ConcurrentConccetCount;
-
         readonly int m_maxResponseSize;
 
         private GetPornhubMainHtml(Func<Task<MHttpStream>> func, int concurrentConccetCount, int maxResponseSize)
         {
             m_CreateStream = func;
 
-            m_ConcurrentConccetCount = concurrentConccetCount;
-         
             m_maxResponseSize = maxResponseSize;
 
             m_channels = new MyChannels<RequestPack>(concurrentConccetCount);
@@ -86,8 +82,11 @@ namespace Pornhub
 
                     MHttpResponse response = await MHttpResponse.ReadAsync(stream, m_maxResponseSize).ConfigureAwait(false);
 
+
                     if (response.Status == 408 || response.Headers.IsClose())
                     {
+                        stream.Close();
+
                         stream = null;
 
                         return response;
@@ -99,6 +98,8 @@ namespace Pornhub
                 }
                 catch
                 {
+                    stream.Close();
+
                     stream = null;
 
                     throw;
@@ -153,13 +154,13 @@ namespace Pornhub
             }
         }
 
-        void Start()
+        void Start(int concurrentConccetCount)
         {
-            foreach (var item in Enumerable.Range(0, m_ConcurrentConccetCount))
+            foreach (var item in Enumerable.Range(0, concurrentConccetCount))
             {
                 Task t = Task.Run(One);
 
-                Log(t);
+                
             }
         }
 
@@ -168,7 +169,7 @@ namespace Pornhub
         {
             GetPornhubMainHtml request = new GetPornhubMainHtml(func, concurrentConccetCount, maxResponseSize);
 
-            request.Start();
+            request.Start(concurrentConccetCount);
 
             return request;
         }

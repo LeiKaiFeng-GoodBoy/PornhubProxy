@@ -95,25 +95,20 @@ namespace Pornhub
 
         async Task<MHttpResponse> GetResponseAsync(Func<MHttpStream, Task> func)
         {
-            for (int i = 0; i < m_maxRefreshRequestCount; i++)
+
+            while (true)
             {
                 try
                 {
-                    MHttpResponse response = await m_getMainHtml.SendAsync(func).ConfigureAwait(false);
+                    return await m_getMainHtml.SendAsync(func).ConfigureAwait(false);
 
-                    if (response.Status != 408)
-                    {
-                        return response;
-                    }
                 }
                 catch (IOException)
                 {
-
+                    
                 }
 
             }
-
-            return await m_getMainHtml.SendAsync(func).ConfigureAwait(false);
         }
 
         async Task NotVideoHtmlAsync(Func<MHttpStream, Task> request, MHttpStream local)
@@ -179,7 +174,7 @@ namespace Pornhub
             {
                 string s = Environment.NewLine;
 
-                Console.WriteLine($"{s}{s}{e}{s}{s}");
+                //Console.WriteLine($"{s}{s}{e}{s}{s}");
             }
             finally
             {
