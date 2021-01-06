@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -52,6 +53,8 @@ namespace Pornhub
         readonly MyChannels<RequestPack> m_channels;
 
         readonly int m_maxResponseSize;
+
+        public Task Task { get; private set; }
 
         private GetPornhubMainHtml(Func<Task<MHttpStream>> func, int concurrentConccetCount, int maxResponseSize)
         {
@@ -140,28 +143,16 @@ namespace Pornhub
             return await pack.GetTask().ConfigureAwait(false);
         }
 
-        static async void Log(Task t)
-        {
-            try
-            {
-                await t.ConfigureAwait(false);
-            }
-            catch (Exception e)
-            {
-                string s = Environment.NewLine;
-
-                Console.WriteLine($"{s}{s}{"GetPornhubMainHtml Error"}{s}{e}{s}{s}");
-            }
-        }
-
         void Start(int concurrentConccetCount)
         {
+            var list = new List<Task>();
+
             foreach (var item in Enumerable.Range(0, concurrentConccetCount))
             {
-                Task t = Task.Run(One);
-
-                
+                list.Add(Task.Run(One));
             }
+
+            this.Task = Task.WhenAll(list.ToArray());
         }
 
 
