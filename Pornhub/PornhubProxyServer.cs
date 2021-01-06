@@ -1,10 +1,13 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
 using LeiKaiFeng.Http;
+using System.Linq;
+using System.Threading;
 
 namespace Pornhub
 {
@@ -105,13 +108,13 @@ namespace Pornhub
                 }
                 catch (IOException)
                 {
-                    
+                    Console.WriteLine("run");
                 }
 
             }
         }
 
-        async Task NotVideoHtmlAsync(Func<MHttpStream, Task> request, MHttpStream local)
+        async Task GetOneHtmlAsync(Func<MHttpStream, Task> request, MHttpStream local)
         {
 
             MHttpResponse response = await GetResponseAsync(request).ConfigureAwait(false);
@@ -119,27 +122,58 @@ namespace Pornhub
             await SendResponse(response, response.Content.GetString(), local).ConfigureAwait(false);
         }
 
-        async Task VideoHtmlAsync(Func<MHttpStream, Task> requset, MHttpStream local)
+        Task GetSeleteHtmlAsync(Func<MHttpStream, Task> requset, MHttpStream local)
         {
-            for (int i = 0; i < m_maxRefreshRequestCount; i++)
+
+            var list = new List<Task>();
+
+            var source = new TaskCompletionSource<Func<Task>>();
+
+            Func<Task> createOneRequest = async () =>
             {
-
                 MHttpResponse response = await GetResponseAsync(requset).ConfigureAwait(false);
-
 
                 string html = response.Content.GetString();
 
                 if (CheckingVideoHtml(html))
                 {
-
-                    await SendResponse(response, html, local).ConfigureAwait(false);
-                 
-                    return;
+                    source.TrySetResult(() => SendResponse(response, html, local));
                 }
+                else
+                {
+                    Console.WriteLine(false);
+                }
+
+            };
+
+            Func<Task> sendFirstResponse = async () =>
+            {
+                Task allTask = Task.WhenAll(list.ToArray());
+
+                var task = source.Task;
+
+                Task t = await Task.WhenAny(allTask, task).ConfigureAwait(false);
+
+
+                if (object.ReferenceEquals(t, task))
+                {
+                    var v = await task.ConfigureAwait(false);
+               
+                    await v().ConfigureAwait(false);
+                }
+                else
+                {
+                    await GetOneHtmlAsync(requset, local).ConfigureAwait(false);
+                }
+            };
+            
+
+            foreach (var item in Enumerable.Range(0, m_maxRefreshRequestCount))
+            {
+                list.Add(createOneRequest());
             }
 
-            await NotVideoHtmlAsync(requset, local).ConfigureAwait(false);
-
+            return sendFirstResponse();
         }
 
         async Task Conccet(Socket socket)
@@ -161,11 +195,11 @@ namespace Pornhub
                     
                     if (request.Path.IndexOf("view_video.php?viewkey") != -1)
                     {
-                        await VideoHtmlAsync(sendFunc, localStream).ConfigureAwait(false);
+                        await GetSeleteHtmlAsync(sendFunc, localStream).ConfigureAwait(false);
                     }
                     else
                     {
-                        await NotVideoHtmlAsync(sendFunc, localStream).ConfigureAwait(false);
+                        await GetOneHtmlAsync(sendFunc, localStream).ConfigureAwait(false);
                     }
                 }
 
