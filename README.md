@@ -1,3 +1,5 @@
+下载页面https://github.com/LeiKaiFeng-GoodBoy/PornhubProxy/releases
+
 启发项目
 https://github.com/mashirozx/Pixiv-Nginx
 
