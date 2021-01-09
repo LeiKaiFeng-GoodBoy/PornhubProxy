@@ -15,14 +15,14 @@ namespace LeiKaiFeng.Http
 
     public sealed partial class MHttpStream
     {
-        public static async Task<T> CreateTimeOutTaskAsync<T>(Task<T> task, TimeSpan timeSpan, Action timeOutAction, Action completedAction, Action exceptionAction)
+        public static async Task<T> CreateTimeOutTaskAsync<T>(Task<T> task, TimeSpan timeSpan, Action timeOutAction, Action completedAction, Action exceptionOrTimeOutResultAction)
         {
 
             Task t = await Task.WhenAny(task, Task.Delay(timeSpan)).ConfigureAwait(false);
 
-            try
+            if (object.ReferenceEquals(t, task))
             {
-                if (object.ReferenceEquals(t, task))
+                try
                 {
 
                     T value = await task.ConfigureAwait(false);
@@ -31,21 +31,37 @@ namespace LeiKaiFeng.Http
 
                     return value;
                 }
-                else
+                catch
                 {
-                    timeOutAction();
+                    exceptionOrTimeOutResultAction();
 
-                    return await task.ConfigureAwait(false);
+                    throw;
                 }
+
+
             }
-            catch
+            else
             {
-                exceptionAction();
-              
-                throw;
+                timeOutAction();
+
+                try
+                {
+
+                    var value = await task.ConfigureAwait(false);
+
+                    exceptionOrTimeOutResultAction();
+
+                    return value;
+                }
+                catch (Exception e)
+                {
+                    exceptionOrTimeOutResultAction();
+
+                    throw new OperationCanceledException(string.Empty, e);
+                }
+
             }
 
-            
         }
 
 
