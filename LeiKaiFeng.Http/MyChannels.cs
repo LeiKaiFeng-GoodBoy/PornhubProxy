@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -11,7 +12,7 @@ namespace LeiKaiFeng.Http
 
     }
 
-    public sealed class MyChannels<T> where T : class
+    public sealed class MyChannels<T>
     {
         
 
@@ -23,6 +24,8 @@ namespace LeiKaiFeng.Http
 
         readonly SemaphoreSlim m_read_slim;
 
+        public bool IsComplete => m_source.IsCancellationRequested;
+
         public MyChannels(int maxCount)
         {
             m_write_slim = new SemaphoreSlim(maxCount, maxCount);
@@ -30,8 +33,7 @@ namespace LeiKaiFeng.Http
             m_read_slim = new SemaphoreSlim(0, maxCount);
         }
 
-
-        public async Task WriteAsync(T value)
+        async Task WriteAsync_(T value)
         {
             try
             {
@@ -49,7 +51,12 @@ namespace LeiKaiFeng.Http
             m_read_slim.Release();
         }
 
-        public async Task<T> ReadAsync()
+        public Task WriteAsync(T value)
+        {
+            return WriteAsync_(value);
+        }
+
+        async Task<T> ReadAsync_(bool isReportCompletedImmediately)
         {
             bool canceled;
 
@@ -63,7 +70,16 @@ namespace LeiKaiFeng.Http
             }
             catch (OperationCanceledException)
             {
-                canceled = true;
+                if (isReportCompletedImmediately)
+                {
+                    throw new MyChannelsCompletedException();
+                }
+                else
+                {
+
+                    canceled = true;
+                }
+
             }
 
 
@@ -83,13 +99,59 @@ namespace LeiKaiFeng.Http
                 {
                     throw new NotSupportedException("内部实现出错");
                 }
-                
+
             }
 
-            
+
+        }
+
+        public Task<T> ReadAsync()
+        {
+            return ReadAsync_(false);
+        }
+
+        public Task<T> ReadReportCompletedImmediatelyAsync()
+        {
+            return ReadAsync_(true);
+        }
+
+        async Task<T[]> ReadRemainderAsync_()
+        {
+            var list = new List<T>();
+
+            try
+            {
+
+                while (true)
+                {
+                    var item = await ReadAsync().ConfigureAwait(false);
+
+                    list.Add(item);
+                }
+            }
+            catch (MyChannelsCompletedException)
+            {
+
+            }
+
+            return list.ToArray();
+
+        }
+
+        public Task<T[]> ReadRemainderAsync()
+        {
+            if (IsComplete)
+            {
+                return ReadRemainderAsync_();
+            }
+            else
+            {
+                throw new InvalidOperationException("管道未完成");
+            }
         }
 
         int m_flag = 0;
+       
         public void CompleteAdding()
         {
             if (Interlocked.Exchange(ref m_flag, 1) == 0)
