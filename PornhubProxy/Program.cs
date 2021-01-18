@@ -126,7 +126,7 @@ namespace PornhubProxy
                 Connect.CreateLocalStream,
                 1024 * 1024 * 5,
                 6,
-                10);
+                30);
 
 
             Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
