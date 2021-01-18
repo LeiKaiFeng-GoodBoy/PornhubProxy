@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 
 namespace LeiKaiFeng.Http
 {
+    //完成后读取端可能会丢失项
+
     [Serializable]
     public sealed class MyChannelsCompletedException : Exception
     {
@@ -58,15 +60,10 @@ namespace LeiKaiFeng.Http
 
         async Task<T> ReadAsync_(bool isReportCompletedImmediately)
         {
-            bool canceled;
-
             try
             {
 
                 await m_read_slim.WaitAsync(m_source.Token).ConfigureAwait(false);
-
-                canceled = false;
-
             }
             catch (OperationCanceledException)
             {
@@ -74,12 +71,7 @@ namespace LeiKaiFeng.Http
                 {
                     throw new MyChannelsCompletedException();
                 }
-                else
-                {
-
-                    canceled = true;
-                }
-
+              
             }
 
 
@@ -91,15 +83,7 @@ namespace LeiKaiFeng.Http
             }
             else
             {
-                if (canceled)
-                {
-                    throw new MyChannelsCompletedException();
-                }
-                else
-                {
-                    throw new NotSupportedException("内部实现出错");
-                }
-
+                throw new MyChannelsCompletedException();
             }
 
 
