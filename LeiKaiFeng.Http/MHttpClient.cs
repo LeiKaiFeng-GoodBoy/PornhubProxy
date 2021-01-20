@@ -61,7 +61,7 @@ namespace LeiKaiFeng.Http
         {
             await m_handler.ConnectCallback(socket, uri).ConfigureAwait(false);
 
-            return await m_handler.AuthenticateCallback(new NetworkStream(socket, false), uri).ConfigureAwait(false);
+            return await m_handler.AuthenticateCallback(new NetworkStream(socket, true), uri).ConfigureAwait(false);
         }
 
         async Task<MHttpStream> CreateNewConnectAsync(Uri uri, CancellationToken cancellationToken)
