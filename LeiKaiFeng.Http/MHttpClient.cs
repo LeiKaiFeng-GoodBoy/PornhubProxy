@@ -2,6 +2,7 @@
 using System.IO;
 using System.Net.Sockets;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace LeiKaiFeng.Http
 {
@@ -63,13 +64,14 @@ namespace LeiKaiFeng.Http
             return await m_handler.AuthenticateCallback(new NetworkStream(socket, false), uri).ConfigureAwait(false);
         }
 
-        async Task<MHttpStream> CreateNewConnectAsync(Uri uri)
+        async Task<MHttpStream> CreateNewConnectAsync(Uri uri, CancellationToken cancellationToken)
         {
             Socket socket = new Socket(m_handler.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
 
             var stream = await MHttpStream.CreateTimeOutTaskAsync(
                 CreateNewConnectAsync(socket, uri),
                 ConnectTimeOut,
+                cancellationToken,
                 socket.Close,
                 () => { },
                 socket.Close).ConfigureAwait(false);
@@ -77,20 +79,21 @@ namespace LeiKaiFeng.Http
             return new MHttpStream(socket, stream);
         }
 
-        Task<MHttpResponse> Internal_SendAsync(Uri uri, MHttpRequest request, MHttpStream stream)
+        Task<MHttpResponse> Internal_SendAsync(Uri uri, MHttpRequest request, MHttpStream stream, CancellationToken cancellationToken)
         {
 
 
             return MHttpStream.CreateTimeOutTaskAsync(
                 Internal_SendAsync(request, stream),
                 ResponseTimeOut,
+                cancellationToken,
                 stream.Cancel,
                 () => m_pool.Set(uri, stream),
                 stream.Close);
         }
 
 
-        async Task<MHttpResponse> Internal_SendAsync_Catch_IOException(Uri uri, MHttpRequest request)
+        async Task<MHttpResponse> Internal_SendAsync_Catch_IOException(Uri uri, MHttpRequest request, CancellationToken cancellationToken)
         {
             MHttpStream stream = m_pool.Get(uri);
 
@@ -98,7 +101,7 @@ namespace LeiKaiFeng.Http
             {
                 try
                 {
-                    return await Internal_SendAsync(uri, request, stream).ConfigureAwait(false);
+                    return await Internal_SendAsync(uri, request, stream, cancellationToken).ConfigureAwait(false);
                 }
                 catch (IOException)
                 {
@@ -106,17 +109,17 @@ namespace LeiKaiFeng.Http
                 }
             }
 
-            stream = await CreateNewConnectAsync(uri).ConfigureAwait(false);
+            stream = await CreateNewConnectAsync(uri, cancellationToken).ConfigureAwait(false);
 
 
-            return await Internal_SendAsync(uri, request, stream).ConfigureAwait(false);
+            return await Internal_SendAsync(uri, request, stream, cancellationToken).ConfigureAwait(false);
         }
 
-        public async Task<MHttpResponse> SendAsync(Uri uri, MHttpRequest request)
+        public async Task<MHttpResponse> SendAsync(Uri uri, MHttpRequest request, CancellationToken cancellationToken)
         {
             try
             {
-                return await Internal_SendAsync_Catch_IOException(uri, request).ConfigureAwait(false);
+                return await Internal_SendAsync_Catch_IOException(uri, request, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception e)
             {
@@ -139,20 +142,20 @@ namespace LeiKaiFeng.Http
             }
         }
 
-        Task<MHttpResponse> SendGetAsync(Uri uri)
+        Task<MHttpResponse> SendGetAsync(Uri uri, CancellationToken cancellationToken)
         {
             MHttpRequest request = MHttpRequest.CreateGet(uri);
 
-            return Internal_SendAsync_Catch_IOException(uri, request);
+            return Internal_SendAsync_Catch_IOException(uri, request, cancellationToken);
         }
 
 
-        public async Task<string> GetStringAsync(Uri uri)
+        public async Task<string> GetStringAsync(Uri uri, CancellationToken cancellationToken)
         {
             try
             {
 
-                MHttpResponse response = await SendGetAsync(uri).ConfigureAwait(false);
+                MHttpResponse response = await SendGetAsync(uri, cancellationToken).ConfigureAwait(false);
 
                 ChuckResponseStatus(response);
 
@@ -165,7 +168,7 @@ namespace LeiKaiFeng.Http
             }
         }
 
-        public async Task<byte[]> GetByteArrayAsync(Uri uri, Uri referer)
+        public async Task<byte[]> GetByteArrayAsync(Uri uri, Uri referer, CancellationToken cancellationToken)
         {
             try
             {
@@ -174,7 +177,7 @@ namespace LeiKaiFeng.Http
 
                 request.Headers.Set("Referer", referer.AbsoluteUri);
 
-                MHttpResponse response = await Internal_SendAsync_Catch_IOException(uri, request).ConfigureAwait(false);
+                MHttpResponse response = await Internal_SendAsync_Catch_IOException(uri, request, cancellationToken).ConfigureAwait(false);
 
                 ChuckResponseStatus(response);
 
@@ -190,12 +193,12 @@ namespace LeiKaiFeng.Http
 
         }
 
-        public async Task<byte[]> GetByteArrayAsync(Uri uri)
+        public async Task<byte[]> GetByteArrayAsync(Uri uri, CancellationToken cancellationToken)
         {
             try
             {
 
-                MHttpResponse response = await SendGetAsync(uri).ConfigureAwait(false);
+                MHttpResponse response = await SendGetAsync(uri, cancellationToken).ConfigureAwait(false);
 
                 ChuckResponseStatus(response);
 

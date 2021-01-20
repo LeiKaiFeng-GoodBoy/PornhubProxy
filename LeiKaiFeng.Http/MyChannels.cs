@@ -26,6 +26,8 @@ namespace LeiKaiFeng.Http
 
         readonly SemaphoreSlim m_read_slim;
 
+        public CancellationToken CancellationToken => m_source.Token;
+
         public bool IsComplete => m_source.IsCancellationRequested;
 
         public MyChannels(int maxCount)

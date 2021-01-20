@@ -4,6 +4,7 @@ using System.IO;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace LeiKaiFeng.Http
 {
@@ -15,13 +16,39 @@ namespace LeiKaiFeng.Http
 
     public sealed partial class MHttpStream
     {
-        public static async Task<T> CreateTimeOutTaskAsync<T>(Task<T> task, TimeSpan timeSpan, Action timeOutAction, Action completedAction, Action exceptionOrTimeOutResultAction)
+        static void AddTimeOutContinueWith(Task task)
         {
+            task.ContinueWith((t) =>
+            {
+                try
+                {
+                    t.Wait();
+                }
+                catch (AggregateException)
+                {
 
-            Task t = await Task.WhenAny(task, Task.Delay(timeSpan)).ConfigureAwait(false);
+                }
+                catch (ObjectDisposedException)
+                {
+
+                }
+            });
+        }
+
+        public static async Task<T> CreateTimeOutTaskAsync<T>(Task<T> task, TimeSpan timeSpan, CancellationToken cancellationToken, Action timeOutAction, Action completedAction, Action exceptionOrTimeOutResultAction)
+        {
+            var cancellSource = new CancellationTokenSource(timeSpan);
+
+            Task delayTask = Task.Delay(TimeSpan.FromMilliseconds(-1), CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, cancellSource.Token).Token);
+
+            Task t = await Task.WhenAny(task, delayTask).ConfigureAwait(false);
 
             if (object.ReferenceEquals(t, task))
             {
+                cancellSource.Cancel();
+
+                AddTimeOutContinueWith(delayTask);
+
                 try
                 {
 
@@ -42,6 +69,8 @@ namespace LeiKaiFeng.Http
             }
             else
             {
+                AddTimeOutContinueWith(delayTask);
+
                 timeOutAction();
 
                 try
@@ -444,6 +473,19 @@ namespace LeiKaiFeng.Http
             if (m_is_close_socket == false) 
             {
                 m_is_close_socket = true;
+
+                try
+                {
+                    m_socket.Shutdown(SocketShutdown.Both);
+                }
+                catch (SocketException)
+                {
+
+                }
+                catch (ObjectDisposedException)
+                {
+                    return;
+                }
 
                 m_socket.Close();
             }
