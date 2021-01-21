@@ -37,9 +37,9 @@ namespace LeiKaiFeng.Http
 
         public static async Task<T> CreateTimeOutTaskAsync<T>(Task<T> task, TimeSpan timeSpan, CancellationToken cancellationToken, Action timeOutAction, Action completedAction, Action exceptionOrTimeOutResultAction)
         {
-            var cancellSource = new CancellationTokenSource(timeSpan);
+            var cancellSource = new CancellationTokenSource();
 
-            Task delayTask = Task.Delay(TimeSpan.FromMilliseconds(-1), CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, cancellSource.Token).Token);
+            Task delayTask = Task.Delay(timeSpan, CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, cancellSource.Token).Token);
 
             Task t = await Task.WhenAny(task, delayTask).ConfigureAwait(false);
 
@@ -49,14 +49,13 @@ namespace LeiKaiFeng.Http
 
                 AddTimeOutContinueWith(delayTask);
 
+                T value;
                 try
                 {
 
-                    T value = await task.ConfigureAwait(false);
+                    value = await task.ConfigureAwait(false);
 
-                    completedAction();
-
-                    return value;
+                    
                 }
                 catch
                 {
@@ -65,6 +64,9 @@ namespace LeiKaiFeng.Http
                     throw;
                 }
 
+                completedAction();
+
+                return value;
 
             }
             else
@@ -73,14 +75,13 @@ namespace LeiKaiFeng.Http
 
                 timeOutAction();
 
+                T value;
                 try
                 {
 
-                    var value = await task.ConfigureAwait(false);
+                    value = await task.ConfigureAwait(false);
 
-                    exceptionOrTimeOutResultAction();
-
-                    return value;
+                    
                 }
                 catch (Exception e)
                 {
@@ -88,6 +89,10 @@ namespace LeiKaiFeng.Http
 
                     throw new OperationCanceledException(string.Empty, e);
                 }
+
+                exceptionOrTimeOutResultAction();
+
+                return value;
 
             }
 
