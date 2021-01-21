@@ -471,41 +471,17 @@ namespace LeiKaiFeng.Http
             }
         }
 
-        private bool m_is_close_socket = false;
-
-        private void CloseSocket()
-        {
-            if (m_is_close_socket == false) 
-            {
-                m_is_close_socket = true;
-
-                try
-                {
-                    m_socket.Shutdown(SocketShutdown.Both);
-                }
-                catch (SocketException)
-                {
-
-                }
-                catch (ObjectDisposedException)
-                {
-                    return;
-                }
-
-                m_socket.Close();
-            }
-        }
-
         public void Close()
         {
-            CloseSocket();
-
+            
             m_stream.Close();
+
+            m_socket.Close();
         }
 
         public void Cancel()
         {
-            CloseSocket();
+            m_socket.Close();
         }
     }
 
