@@ -87,7 +87,7 @@ namespace LeiKaiFeng.Http
                 Internal_SendAsync(request, stream),
                 ResponseTimeOut,
                 cancellationToken,
-                stream.Cancel,
+                stream.Close,
                 () => m_pool.Set(uri, stream),
                 stream.Close);
         }
