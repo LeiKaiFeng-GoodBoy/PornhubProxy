@@ -80,7 +80,7 @@ namespace LeiKaiFeng.Http
             int n = await m_stream.ReadAsync(m_buffer, m_read_offset, CanReadSize).ConfigureAwait(false);
 
 
-            if (n == 0)
+            if (n <= 0)
             {
                 throw new IOException("协议未完整读取");
             }
@@ -173,7 +173,7 @@ namespace LeiKaiFeng.Http
 
                 size -= n;
 
-                if (size == 0)
+                if (size <= 0)
                 {
                     //ChuckChunkedEnd(stream);
 
@@ -256,7 +256,7 @@ namespace LeiKaiFeng.Http
             {
                 int n = await this.ReadAsync(buffer, offset, buffer.Length - offset).ConfigureAwait(false);
 
-                if (n == 0)
+                if (n <= 0)
                 {
                     throw new IOException();
                 }
@@ -280,7 +280,7 @@ namespace LeiKaiFeng.Http
             {
                 int n = await this.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
 
-                if (n == 0)
+                if (n <= 0)
                 {
                     //memoryStream.SetLength(memoryStream.Position);
 
@@ -302,7 +302,7 @@ namespace LeiKaiFeng.Http
 
         internal Task ReadByteArrayContentAsync(int length, int maxContentSize, Func<byte[], Task> func)
         {
-            if (length > maxContentSize)
+            if (length > maxContentSize || length < 0)
             {
                 throw new MHttpException("内容长度大于限制长度");
             }
@@ -393,6 +393,11 @@ namespace LeiKaiFeng.Http
             
             m_stream.Close();
 
+            m_socket.Close();
+        }
+
+        public void Cencel()
+        {
             m_socket.Close();
         }
     }
