@@ -19,13 +19,143 @@ namespace LeiKaiFeng.Http
 
     public sealed class MHttpClient
     {
+
+        public static TimeSpan NeverTimeOutTimeSpan => TimeSpan.FromMilliseconds(-1);
+
+
+        static void AddTimeOutContinueWith(Task task)
+        {
+            task.ContinueWith((t) =>
+            {
+                try
+                {
+                    t.Wait();
+                }
+                catch (AggregateException)
+                {
+
+                }
+                catch (ObjectDisposedException)
+                {
+
+                }
+            });
+        }
+
+        static async Task<T> CreateTimeOutTaskAsync<T>(Task<T> task, CancellationToken cancellationToken, Action cancellationOrExceptionAction, Func<bool> isCancell, Action completedAction)
+        {
+            T value;
+            using (cancellationToken.Register(cancellationOrExceptionAction))
+            {
+                try
+                {
+                    value = await task.ConfigureAwait(false);
+                }
+                catch (Exception e)
+                {
+                    cancellationOrExceptionAction();
+
+                    if (isCancell())
+                    {
+                        throw new OperationCanceledException(string.Empty, e, cancellationToken);
+                    }
+                    else
+                    {
+                        throw;
+                    }
+                }
+            }
+
+            completedAction();
+
+            return value;
+        }
+
+        static void CreateCencellTokenFunc(TimeSpan timeSpan, CancellationToken cancellationToken, out CancellationToken outTokan, out Action outCloseSource)
+        {
+
+            if (timeSpan == NeverTimeOutTimeSpan) 
+            {
+                outTokan = cancellationToken;
+
+                outCloseSource = () => { };
+            }
+            else
+            {
+                if (cancellationToken == CancellationToken.None)
+                {
+                    var timeOutCancellSource = new CancellationTokenSource(timeSpan);
+
+                    outTokan = timeOutCancellSource.Token;
+
+                    outCloseSource = timeOutCancellSource.Dispose;
+                }
+                else
+                {
+                    var timeOutCancellSource = new CancellationTokenSource(timeSpan);
+
+                    var joinCancellSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeOutCancellSource.Token);
+
+                    outTokan = joinCancellSource.Token;
+
+                    outCloseSource = () =>
+                    {
+                        timeOutCancellSource.Dispose();
+
+                        joinCancellSource.Dispose();
+                    };
+                }
+            }
+        }
+
+        static void CreateCencellFunc(Action closeSourceAction, Action closeAction, Action completedAction, out Func<bool> outIsCencellFunc, out Action outCompletedAction, out Action outCencellOrExceptionAction)
+        {
+            int cencellFlag = 0;
+
+            Func<bool> isCencellFunc = () => Volatile.Read(ref cencellFlag) != 0;
+
+            outIsCencellFunc = isCencellFunc;
+
+            outCompletedAction = () =>
+            {
+                if (isCencellFunc() == false)
+                {
+                    closeSourceAction();
+
+                    completedAction();
+                }
+            };
+
+            outCencellOrExceptionAction = () =>
+            {
+                if (Interlocked.Exchange(ref cencellFlag, 1) == 0)
+                {
+                    closeAction();
+                }
+            };
+
+        }
+
+        static Task<T> CreateTimeOutTaskAsync<T>(Task<T> task, TimeSpan timeSpan, CancellationToken cancellationToken, Action closeAction, Action completedAction)
+        {
+            CreateCencellTokenFunc(
+                timeSpan, cancellationToken,
+                out CancellationToken outTokan, out Action closeSourceAction);
+
+            CreateCencellFunc(closeSourceAction, closeAction, completedAction,
+                out Func<bool> outIsCencellFunc, out Action outCompletedAction, out Action outCencellOrExceptionAction);
+
+
+            return CreateTimeOutTaskAsync(task, outTokan, outCencellOrExceptionAction, outIsCencellFunc, outCompletedAction);
+        }
+
+
+
         readonly StreamPool m_pool;
 
         readonly MHttpClientHandler m_handler;
 
         public TimeSpan ConnectTimeOut { get; set; }
-
-
 
         public TimeSpan ResponseTimeOut { get; set; }
 
@@ -43,9 +173,9 @@ namespace LeiKaiFeng.Http
 
             m_pool = new StreamPool(handler.MaxStreamPoolCount);
 
-            ResponseTimeOut = new TimeSpan(0, 1, 0);
+            ResponseTimeOut = NeverTimeOutTimeSpan;
 
-            ConnectTimeOut = new TimeSpan(0, 0, 9);
+            ConnectTimeOut = NeverTimeOutTimeSpan;
         }
 
 
@@ -68,7 +198,7 @@ namespace LeiKaiFeng.Http
         {
             Socket socket = new Socket(m_handler.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
 
-            var stream = await MHttpStream.CreateTimeOutTaskAsync(
+            var stream = await CreateTimeOutTaskAsync(
                 CreateNewConnectAsync(socket, uri),
                 ConnectTimeOut,
                 cancellationToken,
@@ -82,7 +212,7 @@ namespace LeiKaiFeng.Http
         {
 
 
-            return MHttpStream.CreateTimeOutTaskAsync(
+            return CreateTimeOutTaskAsync(
                 Internal_SendAsync(request, stream),
                 ResponseTimeOut,
                 cancellationToken,
