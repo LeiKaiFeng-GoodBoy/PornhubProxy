@@ -210,7 +210,7 @@ namespace Pornhub
             }
             finally
             {
-                localStream?.Cancel();
+                localStream?.Close();
             }
         }
 

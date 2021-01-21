@@ -73,8 +73,7 @@ namespace LeiKaiFeng.Http
                 ConnectTimeOut,
                 cancellationToken,
                 socket.Close,
-                () => { },
-                socket.Close).ConfigureAwait(false);
+                () => { }).ConfigureAwait(false);
 
             return new MHttpStream(socket, stream);
         }
@@ -88,8 +87,7 @@ namespace LeiKaiFeng.Http
                 ResponseTimeOut,
                 cancellationToken,
                 stream.Close,
-                () => m_pool.Set(uri, stream),
-                stream.Close);
+                () => m_pool.Set(uri, stream));
         }
 
 

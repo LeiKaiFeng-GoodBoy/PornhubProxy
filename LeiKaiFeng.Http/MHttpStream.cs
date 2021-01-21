@@ -35,67 +35,111 @@ namespace LeiKaiFeng.Http
             });
         }
 
-        public static async Task<T> CreateTimeOutTaskAsync<T>(Task<T> task, TimeSpan timeSpan, CancellationToken cancellationToken, Action timeOutAction, Action completedAction, Action exceptionOrTimeOutResultAction)
+        static async Task<T> CreateTimeOutTaskAsync<T>(Task<T> task, CancellationToken cancellationToken, Action cancellationOrExceptionAction, Func<bool> isCancell, Action completedAction)
         {
-            var cancellSource = new CancellationTokenSource();
-
-            Task delayTask = Task.Delay(timeSpan, CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, cancellSource.Token).Token);
-
-            Task t = await Task.WhenAny(task, delayTask).ConfigureAwait(false);
-
-            if (object.ReferenceEquals(t, task))
-            {
-                cancellSource.Cancel();
-
-                AddTimeOutContinueWith(delayTask);
-
-                T value;
+            T value;
+            using (cancellationToken.Register(cancellationOrExceptionAction))
+            { 
                 try
                 {
-
-                    value = await task.ConfigureAwait(false);
-
-                    
+                     value = await task.ConfigureAwait(false);
                 }
-                catch
+                catch(Exception e)
                 {
-                    exceptionOrTimeOutResultAction();
+                    cancellationOrExceptionAction();
 
-                    throw;
+                    if (isCancell())
+                    {
+                        throw new OperationCanceledException(string.Empty, e, cancellationToken);
+                    }
+                    else
+                    {
+                        throw;
+                    }
                 }
+            }
 
-                completedAction();
+            completedAction();
 
-                return value;
+            return value;
+        }
 
+        static void CreateCencellTokenFunc(TimeSpan timeSpan, CancellationToken cancellationToken, out CancellationToken outTokan, out Action outCloseSource)
+        {
+
+            if (timeSpan == TimeSpan.FromMilliseconds(-1))
+            {
+                outTokan = cancellationToken;
+
+                outCloseSource = () => { };
             }
             else
             {
-                AddTimeOutContinueWith(delayTask);
-
-                timeOutAction();
-
-                T value;
-                try
+                if (cancellationToken == CancellationToken.None)
                 {
+                    var timeOutCancellSource = new CancellationTokenSource(timeSpan);
 
-                    value = await task.ConfigureAwait(false);
+                    outTokan = timeOutCancellSource.Token;
 
-                    
+                    outCloseSource = timeOutCancellSource.Dispose;
                 }
-                catch (Exception e)
+                else
                 {
-                    exceptionOrTimeOutResultAction();
+                    var timeOutCancellSource = new CancellationTokenSource(timeSpan);
 
-                    throw new OperationCanceledException(string.Empty, e);
+                    var joinCancellSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeOutCancellSource.Token);
+
+                    outTokan = joinCancellSource.Token;
+
+                    outCloseSource = () =>
+                    {
+                        timeOutCancellSource.Dispose();
+
+                        joinCancellSource.Dispose();
+                    };
                 }
-
-                exceptionOrTimeOutResultAction();
-
-                return value;
-
             }
+        }
 
+        static void CreateCencellFunc(Action closeSourceAction, Action closeAction, Action completedAction, out Func<bool> outIsCencellFunc, out Action outCompletedAction, out Action outCencellOrExceptionAction)
+        {
+            int cencellFlag = 0;
+
+            Func<bool> isCencellFunc = () => Volatile.Read(ref cencellFlag) != 0;
+
+            outIsCencellFunc = isCencellFunc;
+
+            outCompletedAction = () =>
+            {
+                if (isCencellFunc() == false)
+                {
+                    closeSourceAction();
+
+                    completedAction();
+                }
+            };
+
+            outCencellOrExceptionAction = () =>
+            {
+                if (Interlocked.Exchange(ref cencellFlag, 1) == 0)
+                {
+                    closeAction();
+                }
+            };
+
+        }
+
+        public static Task<T> CreateTimeOutTaskAsync<T>(Task<T> task, TimeSpan timeSpan, CancellationToken cancellationToken, Action closeAction, Action completedAction)
+        {
+            CreateCencellTokenFunc(
+                timeSpan, cancellationToken,
+                out CancellationToken outTokan, out Action closeSourceAction);
+
+            CreateCencellFunc(closeSourceAction, closeAction, completedAction,
+                out Func<bool> outIsCencellFunc, out Action outCompletedAction, out Action outCencellOrExceptionAction);
+
+
+            return CreateTimeOutTaskAsync(task, outTokan, outCencellOrExceptionAction, outIsCencellFunc, outCompletedAction);
         }
 
 
@@ -476,11 +520,6 @@ namespace LeiKaiFeng.Http
             
             m_stream.Close();
 
-            m_socket.Close();
-        }
-
-        public void Cancel()
-        {
             m_socket.Close();
         }
     }
