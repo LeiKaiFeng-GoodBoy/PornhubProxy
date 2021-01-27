@@ -25,6 +25,8 @@ namespace Test
 
         static async Task Main(string[] args)
         {
+            AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException;
+
             try
             {
                 await TestString();
@@ -36,6 +38,11 @@ namespace Test
 
             Console.ReadLine();
             
+        }
+
+        private static void CurrentDomain_FirstChanceException(object sender, System.Runtime.ExceptionServices.FirstChanceExceptionEventArgs e)
+        {
+            Console.WriteLine(e.Exception);
         }
     }
 }
