@@ -18,6 +18,8 @@ namespace LeiKaiFeng.Http
     {
         readonly struct VoidType { };
 
+        delegate bool InnerReadAsyncFunc<T>(out T value);
+
         static readonly byte[] s_mark = Encoding.UTF8.GetBytes("\r\n");
 
         static readonly byte[] s_tow_mark = Encoding.UTF8.GetBytes("\r\n\r\n");
@@ -74,23 +76,34 @@ namespace LeiKaiFeng.Http
             }
         }
 
-        Task<T> Inner_ReadAsync<T>(Func<(bool isHoldRead, T result)> func)
+        Task<T> Inner_ReadAsync<T>(InnerReadAsyncFunc<T> func)
         {
-            var(isHoldRead, result) = func();
 
-
-            if (isHoldRead)
+            if (func(out var value))
             {
-                return Inner_ReadAsync_Core(func);
+                return Task.FromResult(value);
             }
             else
             {
-                return Task.FromResult(result);
+                return Inner_ReadAsync_Core(func);
+            }
+        }
+
+        Task Inner_ReadAsync(Func<bool> func)
+        {
+
+            if (func())
+            {
+                return Task.CompletedTask;
+            }
+            else
+            {
+                return Inner_ReadAsync_Core((out VoidType v) => func());
             }
         }
 
 
-        async Task<T> Inner_ReadAsync_Core<T>(Func<(bool isHoldRead, T result)> func)
+        async Task<T> Inner_ReadAsync_Core<T>(InnerReadAsyncFunc<T> func)
         {
 
             while (true) 
@@ -110,17 +123,15 @@ namespace LeiKaiFeng.Http
                 }
 
 
-                var (isHoldRead, result) = func();
-
-                if (isHoldRead == false)
+                if (func(out var value))
                 {
-                    return result;
+                    return value;
                 }
             }
 
         }
 
-        (bool isHoldRead, int result) GetChunkedLength()
+        bool GetChunkedLength(out int length)
         {
             
 
@@ -130,7 +141,9 @@ namespace LeiKaiFeng.Http
 
             if (index == -1)
             {
-                return (true, default);
+                length = default;
+
+                return false;
             }
             else
             {
@@ -138,7 +151,7 @@ namespace LeiKaiFeng.Http
 
                 string s = Encoding.UTF8.GetString(m_buffer, m_used_offset, length_s_size);
 
-                int length = int.Parse(s, System.Globalization.NumberStyles.AllowHexSpecifier);
+                length = int.Parse(s, System.Globalization.NumberStyles.AllowHexSpecifier);
 
                 if (length < 0)
                 {
@@ -149,7 +162,7 @@ namespace LeiKaiFeng.Http
 
                     m_used_offset = (index + s_mark.Length);
 
-                    return (false, length);
+                    return true;
 
                 }
             }
@@ -195,7 +208,7 @@ namespace LeiKaiFeng.Http
         {
             size = checked(size + s_mark.Length);
 
-            return Inner_ReadAsync<VoidType>(() =>
+            return Inner_ReadAsync(() =>
             {
                 int n = Copy(stream, size);
 
@@ -205,11 +218,11 @@ namespace LeiKaiFeng.Http
                 {
                     stream.Position -= s_mark.Length;
 
-                    return (false, default);
+                    return true;
                 }
                 else
                 {
-                    return (true, default);
+                    return false;
                 }
             });
         }
@@ -224,7 +237,7 @@ namespace LeiKaiFeng.Http
             }
         }
 
-        (bool isHoldRead, ArraySegment<byte> result) FindHeaders()
+        bool FindHeaders(out ArraySegment<byte> buffer)
         {
             
             int usedSize = CanUsedSize;
@@ -233,8 +246,9 @@ namespace LeiKaiFeng.Http
 
             if (index == -1)
             {
-                return (true, default);
+                buffer = default;
 
+                return false;
             }
             else
             {
@@ -246,7 +260,9 @@ namespace LeiKaiFeng.Http
 
                 m_used_offset = index;
 
-                return (false, new ArraySegment<byte>(m_buffer, offset, size));
+                buffer = new ArraySegment<byte>(m_buffer, offset, size);
+
+                return true;
 
             }
 
@@ -255,17 +271,20 @@ namespace LeiKaiFeng.Http
         internal Task<T> ReadHeadersAsync<T>(Func<ArraySegment<byte>, T> func)
         {
 
-            return Inner_ReadAsync(() =>
+            return Inner_ReadAsync((out T value) =>
             {
-                var (isHoldRead, result) = FindHeaders();
-
-                if (isHoldRead)
+                
+                if (FindHeaders(out var buffer))
                 {
-                    return (true, default);
+                    value = func(buffer);
+
+                    return true;
                 }
                 else
                 {
-                    return (false, func(result));
+                    value = default;
+
+                    return false;
                 }
             });
         }
@@ -349,7 +368,7 @@ namespace LeiKaiFeng.Http
             while (true)
             {
                 
-                var length = await Inner_ReadAsync(GetChunkedLength).ConfigureAwait(false);
+                var length = await Inner_ReadAsync<int>(GetChunkedLength).ConfigureAwait(false);
 
                 long sumLength = checked(stream.Position + length);
 
