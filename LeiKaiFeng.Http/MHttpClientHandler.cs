@@ -8,7 +8,27 @@ namespace LeiKaiFeng.Http
 {
     public sealed class MHttpClientHandler
     {
-       
+
+        public static Func<Stream, Uri, Task<Stream>> CreateCreateAuthenticateAsyncFunc(string host)
+        {
+            return async (stream, uri) =>
+            {
+                SslStream sslStream = new SslStream(stream, false);
+
+                await sslStream.AuthenticateAsClientAsync(host).ConfigureAwait(false);
+
+
+                return sslStream;
+            };
+
+
+        }
+
+        public static Func<Socket, Uri, Task> CreateCreateConnectAsyncFunc(string host, int port)
+        {
+            return (socket, uri) => Task.Run(() => socket.Connect(host, port));
+        }
+
         public Func<Socket, Uri, Task> ConnectCallback { get; set; }
 
         public Func<Stream, Uri, Task<Stream>> AuthenticateCallback { get; set; }
