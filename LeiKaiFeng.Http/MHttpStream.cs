@@ -16,6 +16,8 @@ namespace LeiKaiFeng.Http
 
     public sealed partial class MHttpStream
     {
+        readonly struct VoidType { };
+
         static readonly byte[] s_mark = Encoding.UTF8.GetBytes("\r\n");
 
         static readonly byte[] s_tow_mark = Encoding.UTF8.GetBytes("\r\n\r\n");
@@ -72,26 +74,53 @@ namespace LeiKaiFeng.Http
             }
         }
 
-        async Task ReadAsync()
+        Task<T> Inner_ReadAsync<T>(Func<(bool isHoldRead, T result)> func)
         {
-
-            Move();
-
-            int n = await m_stream.ReadAsync(m_buffer, m_read_offset, CanReadSize).ConfigureAwait(false);
+            var(isHoldRead, result) = func();
 
 
-            if (n <= 0)
+            if (isHoldRead)
             {
-                throw new IOException("协议未完整读取");
+                return Inner_ReadAsync_Core(func);
             }
             else
             {
-                m_read_offset += n;
+                return Task.FromResult(result);
+            }
+        }
+
+
+        async Task<T> Inner_ReadAsync_Core<T>(Func<(bool isHoldRead, T result)> func)
+        {
+
+            while (true) 
+            {
+                Move();
+
+                int n = await m_stream.ReadAsync(m_buffer, m_read_offset, CanReadSize).ConfigureAwait(false);
+
+
+                if (n <= 0)
+                {
+                    throw new IOException("协议未完整读取");
+                }
+                else
+                {
+                    m_read_offset += n;
+                }
+
+
+                var (isHoldRead, result) = func();
+
+                if (isHoldRead == false)
+                {
+                    return result;
+                }
             }
 
         }
 
-        bool GetChunkedLength(out int length)
+        (bool isHoldRead, int result) GetChunkedLength()
         {
             
 
@@ -101,9 +130,7 @@ namespace LeiKaiFeng.Http
 
             if (index == -1)
             {
-                length = default;
-
-                return false;
+                return (true, default);
             }
             else
             {
@@ -111,7 +138,7 @@ namespace LeiKaiFeng.Http
 
                 string s = Encoding.UTF8.GetString(m_buffer, m_used_offset, length_s_size);
 
-                length = int.Parse(s, System.Globalization.NumberStyles.AllowHexSpecifier);
+                int length = int.Parse(s, System.Globalization.NumberStyles.AllowHexSpecifier);
 
                 if (length < 0)
                 {
@@ -122,7 +149,8 @@ namespace LeiKaiFeng.Http
 
                     m_used_offset = (index + s_mark.Length);
 
-                    return true;
+                    return (false, length);
+
                 }
             }
         }
@@ -163,11 +191,11 @@ namespace LeiKaiFeng.Http
         }
 
 
-        async Task CopyChunkedAsync(MemoryStream stream, int size)
+        Task CopyChunkedAsync(MemoryStream stream, int size)
         {
             size = checked(size + s_mark.Length);
 
-            while (true)
+            return Inner_ReadAsync<VoidType>(() =>
             {
                 int n = Copy(stream, size);
 
@@ -175,18 +203,15 @@ namespace LeiKaiFeng.Http
 
                 if (size <= 0)
                 {
-                    //ChuckChunkedEnd(stream);
-
                     stream.Position -= s_mark.Length;
 
-                    return;
+                    return (false, default);
                 }
                 else
                 {
-                    await ReadAsync().ConfigureAwait(false);
+                    return (true, default);
                 }
-            }
-
+            });
         }
 
         static void ChuckChunkedEnd(MemoryStream stream)
@@ -199,7 +224,7 @@ namespace LeiKaiFeng.Http
             }
         }
 
-        bool FindHeaders(out ArraySegment<byte> buffer)
+        (bool isHoldRead, ArraySegment<byte> result) FindHeaders()
         {
             
             int usedSize = CanUsedSize;
@@ -208,9 +233,8 @@ namespace LeiKaiFeng.Http
 
             if (index == -1)
             {
-                buffer = default;
+                return (true, default);
 
-                return false;
             }
             else
             {
@@ -222,28 +246,28 @@ namespace LeiKaiFeng.Http
 
                 m_used_offset = index;
 
-                buffer = new ArraySegment<byte>(m_buffer, offset, size);
+                return (false, new ArraySegment<byte>(m_buffer, offset, size));
 
-                return true;
             }
 
         }
 
-        internal async Task<T> ReadHeadersAsync<T>(Func<ArraySegment<byte>, T> func)
+        internal Task<T> ReadHeadersAsync<T>(Func<ArraySegment<byte>, T> func)
         {
 
-            while (true)
+            return Inner_ReadAsync(() =>
             {
+                var (isHoldRead, result) = FindHeaders();
 
-                if (FindHeaders(out var buffer))
+                if (isHoldRead)
                 {
-                    return func(buffer);
+                    return (true, default);
                 }
                 else
                 {
-                    await ReadAsync().ConfigureAwait(false);
+                    return (false, func(result));
                 }
-            }
+            });
         }
 
         async Task ReadByteArrayAsync(int size, Func<byte[], Task> func)
@@ -324,22 +348,17 @@ namespace LeiKaiFeng.Http
 
             while (true)
             {
+                
+                var length = await Inner_ReadAsync(GetChunkedLength).ConfigureAwait(false);
 
+                long sumLength = checked(stream.Position + length);
 
-                if (!GetChunkedLength(out int length))
+                if (sumLength > maxContentSize)
                 {
-                    await ReadAsync().ConfigureAwait(false);
+                    throw new MHttpException("内容长度大于限制长度");
                 }
                 else
                 {
-                    long sumLength = checked(stream.Position + length);
-                    
-                    if (sumLength > maxContentSize)
-                    {
-                        throw new MHttpException("内容长度大于限制长度");
-                    }
-
-
                     await CopyChunkedAsync(stream, length).ConfigureAwait(false);
 
                     if (length == 0)
@@ -352,10 +371,8 @@ namespace LeiKaiFeng.Http
 
                         return;
                     }
-                   
                 }
-
-
+                
             }
         }
 
