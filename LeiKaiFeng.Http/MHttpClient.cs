@@ -135,7 +135,7 @@ namespace LeiKaiFeng.Http
 
 
         
-        static async Task<TR> CreateTimeOutTaskAsync<T, TR>(Task<T> task, Func<T, TR> translateFunc, Helper helper)
+        static async Task<TR> CreateTimeOutTaskAsync<T, TR>(Func<Task>[] taskFuncs, Func<Task<T>> resultFunc, Func<T, TR> translateFunc, Helper helper)
         {
             T value;
             
@@ -143,7 +143,12 @@ namespace LeiKaiFeng.Http
             
             try
             {
-                value = await task.ConfigureAwait(false);      
+                foreach (var func in taskFuncs)
+                {
+                    await func().ConfigureAwait(false);
+                }
+
+                value = await resultFunc().ConfigureAwait(false);      
             }
             catch (Exception e)
             {
@@ -173,11 +178,11 @@ namespace LeiKaiFeng.Http
         }
 
 
-        public static Task<TR> CreateTimeOutTaskAsync<T, TR>(Task<T> task, Func<T, TR> translateFunc, TimeSpan timeSpan, CancellationToken cancellationToken, Action cencelAction, Action closeAction, Action completedAction)
+        public static Task<TR> CreateTimeOutTaskAsync<T, TR>(Func<Task>[] taskFuncs, Func<Task<T>> resultFunc, Func<T, TR> translateFunc, TimeSpan timeSpan, CancellationToken cancellationToken, Action cencelAction, Action closeAction, Action completedAction)
         {
             var helper = new Helper(timeSpan, cancellationToken, cencelAction, closeAction, completedAction);
 
-            return CreateTimeOutTaskAsync(task, translateFunc, helper);
+            return CreateTimeOutTaskAsync(taskFuncs, resultFunc, translateFunc, helper);
         }
 
     }
@@ -217,27 +222,31 @@ namespace LeiKaiFeng.Http
         }
 
 
-        async Task<MHttpResponse> Internal_SendAsync(MHttpRequest request, MHttpStream stream)
-        {         
-            await request.SendAsync(stream).ConfigureAwait(false);
+        void Internal_SendAsync(MHttpRequest request, MHttpStream stream, out Func<Task>[] taskFuncs, out Func<Task<MHttpResponse>> resultFunc)
+        {
+            taskFuncs = new Func<Task>[] { () => request.SendAsync(stream) };
 
+            resultFunc = () => MHttpResponse.ReadAsync(stream, m_handler.MaxResponseSize);
 
-            return await MHttpResponse.ReadAsync(stream, m_handler.MaxResponseSize).ConfigureAwait(false);
         }
 
-        async Task<Stream> CreateNewConnectAsync(Socket socket, Uri uri)
+        void CreateNewConnectAsync(Socket socket, Uri uri, out Func<Task>[] taskFuncs, out Func<Task<Stream>> resultFunc)
         {
-            await m_handler.ConnectCallback(socket, uri).ConfigureAwait(false);
+            taskFuncs = new Func<Task>[] { () => m_handler.ConnectCallback(socket, uri) };
 
-            return await m_handler.AuthenticateCallback(new NetworkStream(socket, true), uri).ConfigureAwait(false);
+            resultFunc = () => m_handler.AuthenticateCallback(new NetworkStream(socket, true), uri);
+           
         }
 
         Task<MHttpStream> CreateNewConnectAsync(Uri uri, CancellationToken cancellationToken)
         {
             Socket socket = new Socket(m_handler.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
 
+            CreateNewConnectAsync(socket, uri, out var taskFuncs, out var resultFunc);
+            
             return MyCanell.CreateTimeOutTaskAsync(
-                CreateNewConnectAsync(socket, uri),
+                taskFuncs,
+                resultFunc,
                 (stream) => new MHttpStream(socket, stream),
                 ConnectTimeOut,
                 cancellationToken,
@@ -248,10 +257,11 @@ namespace LeiKaiFeng.Http
 
         Task<MHttpResponse> Internal_SendAsync(Uri uri, MHttpRequest request, MHttpStream stream, CancellationToken cancellationToken)
         {
-
+            Internal_SendAsync(request, stream, out var taskFuncs, out var resultFunc);
 
             return MyCanell.CreateTimeOutTaskAsync(
-                Internal_SendAsync(request, stream),
+                taskFuncs,
+                resultFunc,
                 (v) => v,
                 ResponseTimeOut,
                 cancellationToken,

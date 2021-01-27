@@ -148,13 +148,12 @@ namespace LeiKaiFeng.Http
             }
             else
             {
-                int length_s_size = index - m_used_offset;
-
-                if (Utf8Parser.TryParse(m_buffer.AsSpan(m_used_offset, length_s_size), out length, out int used_s_size, 'X') &&
+                
+                if (Utf8Parser.TryParse(m_buffer.AsSpan(m_used_offset, index), out length, out int used_s_size, 'X') &&
                     length >= 0 &&
-                    used_s_size == length_s_size)
+                    used_s_size == index)
                 {
-                    m_used_offset = (index + s_mark.Length);
+                    m_used_offset += (index + s_mark.Length);
 
                     return true;
                 }
@@ -254,9 +253,9 @@ namespace LeiKaiFeng.Http
 
                 int offset = m_used_offset;
 
-                int size = index - m_used_offset;
+                int size = index;
 
-                m_used_offset = index;
+                m_used_offset += index;
 
                 buffer = new ArraySegment<byte>(m_buffer, offset, size);
 

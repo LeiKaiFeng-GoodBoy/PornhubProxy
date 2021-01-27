@@ -25,7 +25,17 @@ namespace Test
 
         static async Task Main(string[] args)
         {
-            await TestString();
+            try
+            {
+                await TestString();
+            }
+            catch(Exception e)
+            {
+                Console.WriteLine(e);
+            }
+
+            Console.ReadLine();
+            
         }
     }
 }
