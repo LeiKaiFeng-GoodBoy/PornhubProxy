@@ -271,38 +271,44 @@ namespace LeiKaiFeng.Http
         }
 
 
-        async Task<MHttpResponse> Internal_SendAsync_Catch_IOException(Uri uri, MHttpRequest request, CancellationToken cancellationToken)
-        {
-            MHttpStream stream = m_pool.Get(uri);
-
-            if (!(stream is null))
-            {
-                try
-                {
-                    return await Internal_SendAsync(uri, request, stream, cancellationToken).ConfigureAwait(false);
-                }
-                catch (IOException)
-                {
-
-                }
-            }
-
-            stream = await CreateNewConnectAsync(uri, cancellationToken).ConfigureAwait(false);
-
-
-            return await Internal_SendAsync(uri, request, stream, cancellationToken).ConfigureAwait(false);
-        }
-
-        public async Task<MHttpResponse> SendAsync(Uri uri, MHttpRequest request, CancellationToken cancellationToken)
+        async Task<T> Internal_SendAsync<T>(Uri uri, MHttpRequest request, CancellationToken cancellationToken, Func<MHttpResponse, T> translateFunc)
         {
             try
             {
-                return await Internal_SendAsync_Catch_IOException(uri, request, cancellationToken).ConfigureAwait(false);
+                MHttpStream stream = m_pool.Get(uri);
+
+                MHttpResponse result;
+
+                if (!(stream is null))
+                {
+                    try
+                    {
+                        result = await Internal_SendAsync(uri, request, stream, cancellationToken).ConfigureAwait(false);
+
+                        return translateFunc(result);
+                    }
+                    catch (IOException)
+                    {
+
+                    }
+                }
+
+                stream = await CreateNewConnectAsync(uri, cancellationToken).ConfigureAwait(false);
+
+
+                result = await Internal_SendAsync(uri, request, stream, cancellationToken).ConfigureAwait(false);
+
+                return translateFunc(result);
             }
-            catch (Exception e)
+            catch(Exception e)
             {
                 throw new MHttpClientException(e);
-            }
+            }     
+        }
+
+        public Task<MHttpResponse> SendAsync(Uri uri, MHttpRequest request, CancellationToken cancellationToken)
+        {
+            return Internal_SendAsync(uri, request, cancellationToken, (res) => res);
         }
 
 
@@ -320,76 +326,50 @@ namespace LeiKaiFeng.Http
             }
         }
 
-        Task<MHttpResponse> SendGetAsync(Uri uri, CancellationToken cancellationToken)
+        public Task<string> GetStringAsync(Uri uri, CancellationToken cancellationToken)
         {
             MHttpRequest request = MHttpRequest.CreateGet(uri);
 
-            return Internal_SendAsync_Catch_IOException(uri, request, cancellationToken);
-        }
-
-
-        public async Task<string> GetStringAsync(Uri uri, CancellationToken cancellationToken)
-        {
-            try
+            return Internal_SendAsync(uri, request, cancellationToken, (response) =>
             {
-
-                MHttpResponse response = await SendGetAsync(uri, cancellationToken).ConfigureAwait(false);
-
                 ChuckResponseStatus(response);
 
 
                 return response.Content.GetString();
-            }
-            catch (Exception e)
-            {
-                throw new MHttpClientException(e);
-            }
+            });
+            
         }
 
-        public async Task<byte[]> GetByteArrayAsync(Uri uri, Uri referer, CancellationToken cancellationToken)
+        public Task<byte[]> GetByteArrayAsync(Uri uri, Uri referer, CancellationToken cancellationToken)
         {
-            try
+
+            MHttpRequest request = MHttpRequest.CreateGet(uri);
+
+            request.Headers.Set("Referer", referer.AbsoluteUri);
+
+            return Internal_SendAsync(uri, request, cancellationToken, (response) =>
             {
 
-                MHttpRequest request = MHttpRequest.CreateGet(uri);
 
-                request.Headers.Set("Referer", referer.AbsoluteUri);
-
-                MHttpResponse response = await Internal_SendAsync_Catch_IOException(uri, request, cancellationToken).ConfigureAwait(false);
 
                 ChuckResponseStatus(response);
 
                 return response.Content.GetByteArray();
-
-
-            }
-            catch (Exception e)
-            {
-                throw new MHttpClientException(e);
-            }
-
+            });
 
         }
 
-        public async Task<byte[]> GetByteArrayAsync(Uri uri, CancellationToken cancellationToken)
+        public Task<byte[]> GetByteArrayAsync(Uri uri, CancellationToken cancellationToken)
         {
-            try
+            MHttpRequest request = MHttpRequest.CreateGet(uri);
+
+            return Internal_SendAsync(uri, request, cancellationToken, (response) =>
             {
-
-                MHttpResponse response = await SendGetAsync(uri, cancellationToken).ConfigureAwait(false);
-
                 ChuckResponseStatus(response);
 
 
                 return response.Content.GetByteArray();
-
-
-            }
-            catch (Exception e)
-            {
-                throw new MHttpClientException(e);
-            }
-
+            });
 
         }
 
