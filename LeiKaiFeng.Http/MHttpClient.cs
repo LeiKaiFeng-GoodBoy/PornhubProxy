@@ -86,11 +86,6 @@ namespace LeiKaiFeng.Http
                 }
             }
 
-            public bool IsCencell()
-            {
-                return Volatile.Read(ref m_cancellFlag) != 0;
-            }
-
             bool IsGetLock()
             {
                 return Interlocked.Exchange(ref m_cancellFlag, 1) == 0;
@@ -105,9 +100,14 @@ namespace LeiKaiFeng.Http
 
             }
 
-            public void ExceptionRun()
+            public bool ExceptionRun()
             {
+
+                bool b = IsGetLock() == false;
+
                 m_closeAction();
+
+                return b;
             }
             
             public void FinallyRun()
@@ -147,9 +147,8 @@ namespace LeiKaiFeng.Http
             }
             catch (Exception e)
             {
-                helper.ExceptionRun();
-
-                if (helper.IsCencell())
+               
+                if (helper.ExceptionRun())
                 {
                     throw new OperationCanceledException(string.Empty, e);
                 }

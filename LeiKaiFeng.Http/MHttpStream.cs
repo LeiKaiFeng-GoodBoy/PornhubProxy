@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 using System.Threading;
+using System.Buffers.Text;
 
 namespace LeiKaiFeng.Http
 {
@@ -137,7 +138,7 @@ namespace LeiKaiFeng.Http
 
             int used_size = CanUsedSize;
 
-            int index = Pf.FirstIndex(m_buffer, m_used_offset, used_size, s_mark);
+            int index = m_buffer.AsSpan(m_used_offset, used_size).IndexOf(s_mark.AsSpan());
 
             if (index == -1)
             {
@@ -149,22 +150,19 @@ namespace LeiKaiFeng.Http
             {
                 int length_s_size = index - m_used_offset;
 
-                string s = Encoding.UTF8.GetString(m_buffer, m_used_offset, length_s_size);
-
-                length = int.Parse(s, System.Globalization.NumberStyles.AllowHexSpecifier);
-
-                if (length < 0)
+                if (Utf8Parser.TryParse(m_buffer.AsSpan(m_used_offset, length_s_size), out length, out int used_s_size, 'X') &&
+                    length >= 0 &&
+                    used_s_size == length_s_size)
                 {
-                    throw new MHttpException("Chunked Length Is 0");
-                }
-                else
-                {
-
                     m_used_offset = (index + s_mark.Length);
 
                     return true;
-
                 }
+                else
+                {
+                    throw new MHttpException("Chunked Length Is Error");
+                }
+                
             }
         }
 
@@ -242,7 +240,7 @@ namespace LeiKaiFeng.Http
             
             int usedSize = CanUsedSize;
 
-            int index = Pf.FirstIndex(m_buffer, m_used_offset, usedSize, s_tow_mark);
+            int index = m_buffer.AsSpan(m_used_offset, usedSize).IndexOf(s_tow_mark.AsSpan());
 
             if (index == -1)
             {
