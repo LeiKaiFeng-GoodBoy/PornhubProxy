@@ -76,12 +76,12 @@ namespace LeiKaiFeng.Http
             }
         }
 
-        Task<T> Inner_ReadAsync<T>(InnerReadAsyncFunc<T> func)
+        ValueTask<T> Inner_ReadAsync<T>(InnerReadAsyncFunc<T> func)
         {
 
             if (func(out var value))
             {
-                return Task.FromResult(value);
+                return new ValueTask<T>(value);
             }
             else
             {
@@ -89,21 +89,21 @@ namespace LeiKaiFeng.Http
             }
         }
 
-        Task Inner_ReadAsync(Func<bool> func)
+        ValueTask Inner_ReadAsync(Func<bool> func)
         {
 
             if (func())
             {
-                return Task.CompletedTask;
+                return default;
             }
             else
             {
-                return Inner_ReadAsync_Core((out VoidType v) => func());
+                return new ValueTask(Inner_ReadAsync_Core((out VoidType v) => func()).AsTask());
             }
         }
 
 
-        async Task<T> Inner_ReadAsync_Core<T>(InnerReadAsyncFunc<T> func)
+        async ValueTask<T> Inner_ReadAsync_Core<T>(InnerReadAsyncFunc<T> func)
         {
 
             while (true) 
@@ -204,7 +204,7 @@ namespace LeiKaiFeng.Http
         }
 
 
-        Task CopyChunkedAsync(MemoryStream stream, int size)
+        ValueTask CopyChunkedAsync(MemoryStream stream, int size)
         {
             size = checked(size + s_mark.Length);
 
@@ -268,7 +268,7 @@ namespace LeiKaiFeng.Http
 
         }
 
-        internal Task<T> ReadHeadersAsync<T>(Func<ArraySegment<byte>, T> func)
+        internal ValueTask<T> ReadHeadersAsync<T>(Func<ArraySegment<byte>, T> func)
         {
 
             return Inner_ReadAsync((out T value) =>
