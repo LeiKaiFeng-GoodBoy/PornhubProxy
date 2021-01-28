@@ -4,6 +4,7 @@ using LeiKaiFeng.Http;
 using System.Linq;
 using System.Collections.Generic;
 using System.Threading;
+using System.Text.RegularExpressions;
 
 namespace Test
 {
@@ -13,12 +14,17 @@ namespace Test
         {
             MHttpClient client = new MHttpClient();
 
-            foreach (var item in Enumerable.Range(1, 100))
+            foreach (var item in Enumerable.Range(1, 27))
             {
 
-                string s = await client.GetStringAsync(new Uri("https://konachan.net/post?page=" + item + "&tags="), CancellationToken.None);
+                string s = await client.GetStringAsync(new Uri("https://yandere.pp.ua/post/popular_by_day?day="+ item+"&month=1&year=2021"), CancellationToken.None);
 
-                Console.WriteLine(s.Length);
+                Regex regex = new Regex(@"<a class=""directlink (?:largeimg|smallimg)"" href=""([^""]+)""");
+
+
+
+
+                Console.WriteLine(regex.Matches(s).Count);
             }
 
         }
