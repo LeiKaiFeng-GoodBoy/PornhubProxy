@@ -116,7 +116,7 @@ namespace PornhubProxy
 
             Uri uri = PacServer.Start(new IPEndPoint(IPAddress.Loopback, 8080),
                 PacServer.Create(endPoint, "cn.pornhub.com"),
-                PacServer.Create(new IPEndPoint(IPAddress.Loopback, 56789), "www.pornhub.com", "hubt.pornhub.com"));
+                PacServer.Create(new IPEndPoint(IPAddress.Loopback, 80), "www.pornhub.com", "hubt.pornhub.com", "hw-cdn2.adtng.com"));
 
             SetProxy.Set(uri);
 

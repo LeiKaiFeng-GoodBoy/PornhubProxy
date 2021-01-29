@@ -22,7 +22,7 @@ namespace Pornhub
                 throw new ArgumentException("p form exception");
             }
 
-            bool b2 = hosts.All((s) => Regex.IsMatch(s, @"^[a-zA-Z0-9\.]+$"));
+            bool b2 = hosts.All((s) => Regex.IsMatch(s, @"^[a-zA-Z0-9\.-]+$"));
 
 
             if (b2 == false)
