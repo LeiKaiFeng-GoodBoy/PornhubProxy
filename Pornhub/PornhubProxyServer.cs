@@ -58,10 +58,8 @@ namespace Pornhub
 
         static bool CheckingVideoHtml(string html)
         {
-            if (html.IndexOf("cv-h.") == -1 &&
-                html.IndexOf("cv.") == -1 &&
-                html.IndexOf("dv-h.") == -1 &&
-                html.IndexOf("dv.") == -1)
+            if (html.Contains("/ev-h.p") ||
+                html.Contains("/ev.p"))
             {
                 return true;
             }
