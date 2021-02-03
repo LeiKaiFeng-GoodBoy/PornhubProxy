@@ -21,19 +21,26 @@ namespace Pornhub
 
     public sealed class PornhubProxyServer
     {
-        readonly X509Certificate2 m_certificate2;
+        readonly Tuple<string, X509Certificate2, Func<MHttpStream, Task>>[] m_tuples;
 
         readonly GetPornhubMainHtml m_getMainHtml;
 
-        readonly Func<Socket, X509Certificate2, Task<MHttpStream>> m_createLocalConccet;
+        readonly Func<Socket, Tuple<string, X509Certificate2, Func<MHttpStream, Task>>[], Task> m_createLocalConccet;
 
         readonly int m_maxContectSize;
 
         readonly int m_maxRefreshRequestCount;
 
-        public PornhubProxyServer(byte[] certificateRawData, Func<Task<MHttpStream>> createRemoteConccet, Func<Socket, X509Certificate2, Task<MHttpStream>> createLocalConccet, int maxResponseSize, int concurrentConccetCount, int maxRefreshRequestCount)
+        readonly byte[] m_ad_video_buffer = File.ReadAllBytes("985106_video_with_sound.mp4");
+
+        public PornhubProxyServer(X509Certificate2 pcer, X509Certificate2 adcer, Func<Task<MHttpStream>> createRemoteConccet, Func<Socket, Tuple<string, X509Certificate2, Func<MHttpStream, Task>>[], Task> createLocalConccet, int maxResponseSize, int concurrentConccetCount, int maxRefreshRequestCount)
         {
-            m_certificate2 = new X509Certificate2(certificateRawData);
+            m_tuples = new Tuple<string, X509Certificate2, Func<MHttpStream, Task>>[]
+            {
+                Tuple.Create<string, X509Certificate2, Func<MHttpStream, Task>>("cn.pornhub.com", pcer, MainBodyAsync),
+
+                Tuple.Create<string, X509Certificate2, Func<MHttpStream, Task>>("adtng.com", adcer, AdAsync),
+            };
 
             
             m_getMainHtml = GetPornhubMainHtml.Create(createRemoteConccet, concurrentConccetCount, maxResponseSize);
@@ -50,10 +57,12 @@ namespace Pornhub
 
         static string ReplaceResponseHtml(string html)
         {
-            return new StringBuilder(html)
-                .Replace("ci.", "ei.")
-                .Replace("di.", "ei.")
-                .ToString();
+            return html;
+
+            //return new StringBuilder(html)
+            //    .Replace("ci.", "ei.")
+            //    .Replace("di.", "ei.")
+            //    .ToString();
         }
 
         static bool CheckingVideoHtml(string html)
@@ -172,23 +181,38 @@ namespace Pornhub
             return sendFirstResponse();
         }
 
-        async Task Conccet(Socket socket)
+        async Task AdAsync(MHttpStream localStream)
         {
-
-            MHttpStream localStream = null;
-
             try
             {
 
-                localStream = await m_createLocalConccet(socket, m_certificate2).ConfigureAwait(false);
+                var response = MHttpResponse.Create(200);
 
+                response.SetContent(m_ad_video_buffer);
+
+                await response.SendAsync(localStream).ConfigureAwait(false);
+
+                
+                
+            }
+            finally
+            {
+                localStream?.Close();
+            }
+
+        }
+
+        async Task MainBodyAsync(MHttpStream localStream)
+        {
+            try
+            {
                 while (true)
                 {
 
                     MHttpRequest request = await MHttpRequest.ReadAsync(localStream, m_maxContectSize).ConfigureAwait(false);
 
                     var sendFunc = CreateSendFunc(request);
-                    
+
                     if (request.Path.IndexOf("view_video.php?viewkey") != -1)
                     {
                         await GetSeleteHtmlAsync(sendFunc, localStream).ConfigureAwait(false);
@@ -198,6 +222,25 @@ namespace Pornhub
                         await GetOneHtmlAsync(sendFunc, localStream).ConfigureAwait(false);
                     }
                 }
+            }
+            finally
+            {
+                localStream?.Close();
+            }
+
+            
+        }
+
+        async Task Conccet(Socket socket)
+        {
+
+            
+            try
+            {
+
+                await m_createLocalConccet(socket, m_tuples).ConfigureAwait(false);
+
+                
 
             }
             catch (Exception e)
@@ -205,10 +248,6 @@ namespace Pornhub
                 string s = Environment.NewLine;
 
                 //Console.WriteLine($"{s}{s}{e}{s}{s}");
-            }
-            finally
-            {
-                localStream?.Close();
             }
         }
 

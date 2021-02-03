@@ -70,32 +70,45 @@ namespace PornhubProxy
             return new MHttpStream(socket, sslStream);
         }
 
-        static async Task Init(Stream stream)
+        static string GetHost(byte[] buffer, int offset, int count)
+        {
+            string s = Encoding.UTF8.GetString(buffer, offset, count);
+
+            return s.Split(new string[] { "\r\n" }, 2, StringSplitOptions.RemoveEmptyEntries)[0].Split(new char[] { ' ' }, 3, StringSplitOptions.RemoveEmptyEntries)[1].Split(new char[] { ':' }, 2, StringSplitOptions.RemoveEmptyEntries)[0];
+        }
+
+        static async Task<string> Init(Stream stream)
         {
             byte[] buffer = new byte[1024];
 
-            await stream.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
+            int count = await stream.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
 
+            string host = GetHost(buffer, 0, count);
+           
             buffer = Encoding.UTF8.GetBytes("HTTP/1.1 200 OK\r\n\r\n");
 
             await stream.WriteAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
+
+            return host;
         }
 
-        public static async Task<MHttpStream> CreateLocalStream(Socket socket, X509Certificate2 certificate2)
+        public static async Task CreateLocalStream(Socket socket, Tuple<string, X509Certificate2, Func<MHttpStream, Task>>[] tuples)
         {
             Stream stream = new NetworkStream(socket, true);
 
 
-            await Init(stream).ConfigureAwait(false);
+            string host = await Init(stream).ConfigureAwait(false);
+            Console.WriteLine(host);
+            var valu = tuples.First((t) => host.EndsWith(t.Item1));
 
 
 
             SslStream sslStream = new SslStream(stream, false);
 
-            await sslStream.AuthenticateAsServerAsync(certificate2, false, System.Security.Authentication.SslProtocols.Tls12, false).ConfigureAwait(false);
+            await sslStream.AuthenticateAsServerAsync(valu.Item2, false, System.Security.Authentication.SslProtocols.Tls12, false).ConfigureAwait(false);
 
 
-            return new MHttpStream(socket, sslStream);
+            await valu.Item3(new MHttpStream(socket, sslStream)).ConfigureAwait(false);
         }
     }
 
@@ -114,13 +127,14 @@ namespace PornhubProxy
             IPEndPoint endPoint = new IPEndPoint(IPAddress.Loopback, 1080);
 
             Uri uri = PacServer.Start(new IPEndPoint(IPAddress.Loopback, 8080),
-                PacServer.Create(endPoint, "cn.pornhub.com"),
-                PacServer.Create(new IPEndPoint(IPAddress.Loopback, 80), "www.pornhub.com", "hubt.pornhub.com"));//, "hw-cdn2.adtng.com", "ht-cdn2.adtng.com"));
+                PacServer.Create(endPoint, "cn.pornhub.com", "hw-cdn2.adtng.com", "ht-cdn2.adtng.com", "vz-cdn2.adtng.com"),
+                PacServer.Create(new IPEndPoint(IPAddress.Loopback, 80), "www.pornhub.com", "hubt.pornhub.com"));
 
             SetProxy.Set(uri);
 
             PornhubProxyServer server = new PornhubProxyServer(
-                Convert.FromBase64String(PFX_BASE64_TEXT),
+                new X509Certificate2( Convert.FromBase64String(PFX_BASE64_TEXT)),
+                new X509Certificate2(File.ReadAllBytes("adtng.com.pfx")),
                 Connect.CreateRemoteStream,
                 Connect.CreateLocalStream,
                 1024 * 1024 * 5,
