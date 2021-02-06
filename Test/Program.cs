@@ -5,41 +5,64 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Threading;
 using System.Text.RegularExpressions;
+using System.IO;
 
 namespace Test
 {
     class Program
     {
-        static async Task TestString()
+        static async Task TestString(MHttpClient client)
         {
-            MHttpClient client = new MHttpClient();
-
+           
             foreach (var item in Enumerable.Range(1, 27))
             {
 
-                string s = await client.GetStringAsync(new Uri("https://yandere.pp.ua/post/popular_by_day?day="+ item+"&month=1&year=2021"), CancellationToken.None);
+                try
+                {
+                    string s = await client.GetStringAsync(new Uri("https://yandere.pp.ua/post/popular_by_day?day=" + item + "&month=1&year=2021"), CancellationToken.None);
 
-                Regex regex = new Regex(@"<a class=""directlink (?:largeimg|smallimg)"" href=""([^""]+)""");
+                    Regex regex = new Regex(@"<a class=""directlink (?:largeimg|smallimg)"" href=""([^""]+)""");
 
 
 
 
-                Console.WriteLine(regex.Matches(s).Count);
+                    Console.WriteLine(regex.Matches(s).Count);
+                }
+                catch (MHttpClientException e)
+                when(e.InnerException is OperationCanceledException)
+                {
+
+                }
+
+                
             }
 
         }
 
         static async Task Main(string[] args)
         {
-            AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException;
+            //AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException;
+
+            MHttpClient client = new MHttpClient();
+
+            client.ConnectTimeOut = new TimeSpan(0, 0, 2);
+
+            var list = new List<Task>();
+
+            foreach (var item in Enumerable.Range(0, 6)) 
+            {
+                list.Add(TestString(client));
+            }
 
             try
             {
-                await TestString();
+                await Task.WhenAll(list.ToArray());
             }
             catch(Exception e)
             {
-                Console.WriteLine(e);
+                string s = Environment.NewLine;
+
+                File.AppendAllText("log.txt", $"{e}{s}{s}");
             }
 
             Console.ReadLine();

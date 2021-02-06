@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Threading.Channels;
 
 namespace LeiKaiFeng.Http
 {
@@ -70,93 +71,33 @@ namespace LeiKaiFeng.Http
             }
         }
 
-        sealed class Deque
-        {
-            readonly object m_lock = new object();
+        readonly ConcurrentDictionary<HostKey, Channel<MHttpStreamPack>> m_pool = new ConcurrentDictionary<HostKey, Channel<MHttpStreamPack>>();
 
-            readonly LinkedList<MHttpStream> m_list;
-
-            readonly int m_maxCount;
-
-            public Deque(int maxCount)
-            {
-                m_maxCount = maxCount;
-
-                m_list = new LinkedList<MHttpStream>();
-            }
-
-
-            public MHttpStream Add(MHttpStream stream)
-            {
-                lock (m_lock)
-                {
-                    m_list.AddFirst(stream);
-
-                    if (m_list.Count >= m_maxCount)
-                    {
-                        var v = m_list.Last.Value;
-
-                        m_list.RemoveLast();
-
-                        return v;
-                    }
-                    else
-                    {
-                        return null;
-                    }
-                    
-                }
-            }
-
-            public MHttpStream Get()
-            {
-                lock (m_lock)
-                {
-                    var node = m_list.First;
-
-                    if (node is null)
-                    {
-                        return null;
-                    }
-                    else
-                    {
-                        var stream = node.Value;
-
-                        m_list.RemoveFirst();
-
-                        return stream;
-                    }
-                }
-            }
-        }
-
-        readonly ConcurrentDictionary<HostKey, Deque> m_pool = new ConcurrentDictionary<HostKey, Deque>();
-
-        readonly Func<HostKey, Deque> m_create;
+        readonly Func<HostKey, Channel<MHttpStreamPack>> m_create;
 
         public StreamPool(int maxCount)
         {
-            m_create = (k) => new Deque(maxCount);
+            m_create = (k) => Channel.CreateBounded<MHttpStreamPack>(maxCount);
         }
 
      
-        Deque Find(Uri uri)
+        Channel<MHttpStreamPack> Find(Uri uri)
         {
             return m_pool.GetOrAdd(new HostKey(uri), m_create);
         }
 
-        public MHttpStream Get(Uri uri)
+        public bool Get(Uri uri, out MHttpStreamPack pack)
         {
-            var deque = Find(uri);
+            var channel = Find(uri);
 
-            return deque.Get();
+            return channel.Reader.TryRead(out pack);
         }
 
-        public void Set(Uri uri, MHttpStream stream)
+        public bool Set(Uri uri, MHttpStreamPack pack)
         {
-            var deque = Find(uri);
+            var channel = Find(uri);
 
-            deque.Add(stream)?.Close();
+            return channel.Writer.TryWrite(pack);
         }
     }
 }

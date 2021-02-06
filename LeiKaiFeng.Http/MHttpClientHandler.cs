@@ -40,11 +40,15 @@ namespace LeiKaiFeng.Http
 
         public int MaxStreamPoolCount { get; set; }
 
+        public int MaxOneStreamRequestCount { get; set; }
+
         public MHttpClientHandler()
         {
             MaxResponseSize = 1024 * 1024 * 10;
 
             MaxStreamPoolCount = 6;
+
+            MaxOneStreamRequestCount = 6;
 
             AddressFamily = AddressFamily.InterNetwork;
 

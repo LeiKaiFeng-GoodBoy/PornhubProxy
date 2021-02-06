@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using LeiKaiFeng.Http;
 
@@ -50,7 +51,7 @@ namespace Pornhub
 
         readonly Func<Task<MHttpStream>> m_CreateStream;
 
-        readonly MyChannels<RequestPack> m_channels;
+        readonly Channel<RequestPack> m_channels;
 
         readonly int m_maxResponseSize;
 
@@ -62,7 +63,7 @@ namespace Pornhub
 
             m_maxResponseSize = maxResponseSize;
 
-            m_channels = new MyChannels<RequestPack>(concurrentConccetCount);
+            m_channels = Channel.CreateBounded<RequestPack>(concurrentConccetCount);
         }
 
         Func<RequestPack, Task<MHttpResponse>> Create()
@@ -115,7 +116,7 @@ namespace Pornhub
             var sendFunc = Create();
             while (true)
             {
-                RequestPack requestPack = await m_channels.ReadAsync().ConfigureAwait(false);
+                RequestPack requestPack = await m_channels.Reader.ReadAsync().ConfigureAwait(false);
 
                 try
                 {
@@ -138,7 +139,7 @@ namespace Pornhub
         {
             RequestPack pack = new RequestPack(func);
 
-            await m_channels.WriteAsync(pack).ConfigureAwait(false);
+            await m_channels.Writer.WriteAsync(pack).ConfigureAwait(false);
 
             return await pack.GetTask().ConfigureAwait(false);
         }
