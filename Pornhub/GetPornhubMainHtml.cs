@@ -51,7 +51,10 @@ namespace Pornhub
 
         readonly Func<Task<MHttpStream>> m_CreateStream;
 
-        readonly Channel<RequestPack> m_channels;
+        readonly ChannelReader<RequestPack> m_channelReader;
+
+        readonly ChannelWriter<RequestPack> m_channelWriter;
+
 
         readonly int m_maxResponseSize;
 
@@ -63,7 +66,11 @@ namespace Pornhub
 
             m_maxResponseSize = maxResponseSize;
 
-            m_channels = Channel.CreateBounded<RequestPack>(concurrentConccetCount);
+            var channel = Channel.CreateBounded<RequestPack>(concurrentConccetCount);
+
+            m_channelReader = channel;
+
+            m_channelWriter = channel;
         }
 
         Func<RequestPack, Task<MHttpResponse>> Create()
@@ -116,7 +123,7 @@ namespace Pornhub
             var sendFunc = Create();
             while (true)
             {
-                RequestPack requestPack = await m_channels.Reader.ReadAsync().ConfigureAwait(false);
+                RequestPack requestPack = await m_channelReader.ReadAsync().ConfigureAwait(false);
 
                 try
                 {
@@ -139,7 +146,7 @@ namespace Pornhub
         {
             RequestPack pack = new RequestPack(func);
 
-            await m_channels.Writer.WriteAsync(pack).ConfigureAwait(false);
+            await m_channelWriter.WriteAsync(pack).ConfigureAwait(false);
 
             return await pack.GetTask().ConfigureAwait(false);
         }

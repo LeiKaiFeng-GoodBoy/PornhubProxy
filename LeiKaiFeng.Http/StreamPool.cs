@@ -71,17 +71,30 @@ namespace LeiKaiFeng.Http
             }
         }
 
-        readonly ConcurrentDictionary<HostKey, Channel<MHttpStreamPack>> m_pool = new ConcurrentDictionary<HostKey, Channel<MHttpStreamPack>>();
+        sealed class ChannelPack
+        {
+            public ChannelPack(Channel<MHttpStreamPack> channel)
+            {
+                Read = channel;
+                Write = channel;
+            }
 
-        readonly Func<HostKey, Channel<MHttpStreamPack>> m_create;
+            public ChannelReader<MHttpStreamPack> Read { get; private set; }
+
+            public ChannelWriter<MHttpStreamPack> Write { get; private set; }
+        }
+
+        readonly ConcurrentDictionary<HostKey, ChannelPack> m_pool = new ConcurrentDictionary<HostKey, ChannelPack>();
+
+        readonly Func<HostKey, ChannelPack> m_create;
 
         public StreamPool(int maxCount)
         {
-            m_create = (k) => Channel.CreateBounded<MHttpStreamPack>(maxCount);
+            m_create = (k) => new ChannelPack(Channel.CreateBounded<MHttpStreamPack>(maxCount));
         }
 
      
-        Channel<MHttpStreamPack> Find(Uri uri)
+        ChannelPack Find(Uri uri)
         {
             return m_pool.GetOrAdd(new HostKey(uri), m_create);
         }
@@ -90,14 +103,14 @@ namespace LeiKaiFeng.Http
         {
             var channel = Find(uri);
 
-            return channel.Reader.TryRead(out pack);
+            return channel.Read.TryRead(out pack);
         }
 
         public bool Set(Uri uri, MHttpStreamPack pack)
         {
             var channel = Find(uri);
 
-            return channel.Writer.TryWrite(pack);
+            return channel.Write.TryWrite(pack);
         }
     }
 }

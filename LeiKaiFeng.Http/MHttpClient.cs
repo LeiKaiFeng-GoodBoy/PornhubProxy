@@ -224,7 +224,9 @@ namespace LeiKaiFeng.Http
             }
         }
 
-        readonly Channel<ResponsePack> m_channel;
+        readonly ChannelReader<ResponsePack> m_channelReader;
+
+        readonly ChannelWriter<ResponsePack> m_channelWriter;
 
         readonly MHttpStream m_stream;
 
@@ -234,7 +236,11 @@ namespace LeiKaiFeng.Http
         {
             m_stream = stream;
 
-            m_channel = Channel.CreateBounded<ResponsePack>(maxRequestCount);
+            var channel = Channel.CreateBounded<ResponsePack>(maxRequestCount);
+
+            m_channelReader = channel;
+
+            m_channelWriter = channel;
 
             m_count = 0;
         }
@@ -252,7 +258,7 @@ namespace LeiKaiFeng.Http
             {
                 await sendRequestFunc(m_stream).ConfigureAwait(false);
 
-                await m_channel.Writer.WriteAsync(taskPack).ConfigureAwait(false);
+                await m_channelWriter.WriteAsync(taskPack).ConfigureAwait(false);
 
                 ReadResponse();
 
@@ -289,7 +295,7 @@ namespace LeiKaiFeng.Http
         {
             do
             {
-                if (!m_channel.Reader.TryRead(out var taskPack))
+                if (!m_channelReader.TryRead(out var taskPack))
                 {
                     throw new NotImplementedException("内部出错");
                 }
