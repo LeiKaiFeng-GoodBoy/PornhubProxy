@@ -247,7 +247,9 @@ namespace LeiKaiFeng.Http
         }
 
 
-        public static TimeSpan NeverTimeOutTimeSpan => MyCanell.NeverTimeOutTimeSpan;
+
+        public static TimeSpan NeverTimeOutTimeSpan => TimeSpan.FromMilliseconds(-1);
+
 
 
         readonly StreamPool m_pool;
