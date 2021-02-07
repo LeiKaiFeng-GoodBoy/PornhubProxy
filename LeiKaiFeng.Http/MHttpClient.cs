@@ -18,177 +18,6 @@ namespace LeiKaiFeng.Http
         }
     }
 
-    static class MyCanell
-    {
-        sealed class Helper
-        {
-
-            int m_cancellFlag = 0;
-
-
-            CancellationToken m_tokan;
-
-            Action m_closeCencelSourceAction;
-
-            Action m_cencelAction;
-
-            Action m_closeAction;
-
-            Action m_completedAction;
-
-            
-
-
-            public Helper(TimeSpan timeSpan, CancellationToken cancellationToken, Action cencelAction, Action closeAction, Action completedAction)
-            {
-                CreateCencellTokenFunc(timeSpan, cancellationToken, out m_tokan, out m_closeCencelSourceAction);
-
-                m_cencelAction = cencelAction;
-
-                m_closeAction = closeAction;
-
-                m_completedAction = completedAction;
-            }
-
-            static void CreateCencellTokenFunc(TimeSpan timeSpan, CancellationToken cancellationToken, out CancellationToken outTokan, out Action outCloseSource)
-            {
-
-                if (timeSpan == NeverTimeOutTimeSpan)
-                {
-                    outTokan = cancellationToken;
-
-                    outCloseSource = () => { };
-                }
-                else
-                {
-                    if (cancellationToken == CancellationToken.None)
-                    {
-                        var timeOutCancellSource = new CancellationTokenSource(timeSpan);
-
-                        outTokan = timeOutCancellSource.Token;
-
-                        outCloseSource = timeOutCancellSource.Dispose;
-                    }
-                    else
-                    {
-                        var timeOutCancellSource = new CancellationTokenSource(timeSpan);
-
-                        var joinCancellSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeOutCancellSource.Token);
-
-                        outTokan = joinCancellSource.Token;
-
-                        outCloseSource = () =>
-                        {
-                            timeOutCancellSource.Dispose();
-
-                            joinCancellSource.Dispose();
-                        };
-                    }
-                }
-            }
-
-            bool IsGetLock()
-            {
-                return Interlocked.Exchange(ref m_cancellFlag, 1) == 0;
-            }
-
-            public void CompletedRun()
-            {
-                if (IsGetLock())
-                {
-                    m_completedAction();
-                }
-
-            }
-
-            public bool ExceptionRun()
-            {
-
-                bool b = IsGetLock() == false;
-
-                m_closeAction();
-
-                return b;
-            }
-            
-            public void FinallyRun()
-            {
-                m_closeCencelSourceAction();
-            }
-
-
-            void Cancel()
-            {
-                if (IsGetLock())
-                {
-                    m_cencelAction();
-                }     
-            }
-
-
-            public CancellationTokenRegistration Register()
-            {
-                return m_tokan.Register(Cancel);
-            }
-        }
-
-        public static TimeSpan NeverTimeOutTimeSpan => TimeSpan.FromMilliseconds(-1);
-
-
-        
-        static async Task<TR> CreateTimeOutTaskAsync<T, TR>(Func<Task>[] taskFuncs, Func<Task<T>> resultFunc, Func<T, TR> translateFunc, Helper helper)
-        {
-            T value;
-            
-            var register = helper.Register();
-            
-            try
-            {
-                foreach (var func in taskFuncs)
-                {
-                    await func().ConfigureAwait(false);
-                }
-
-                value = await resultFunc().ConfigureAwait(false);      
-            }
-            catch (Exception e)
-            {
-               
-                if (helper.ExceptionRun())
-                {
-                    throw new OperationCanceledException(string.Empty, e);
-                }
-                else
-                {
-                    throw;
-                }
-            }
-            finally
-            {
-                register.Dispose();
-
-                helper.FinallyRun();
-            }
-
-            //让取消回调注销后再执行
-
-            helper.CompletedRun();
-
-            return translateFunc(value);
-
-        }
-
-
-        public static Task<TR> CreateTimeOutTaskAsync<T, TR>(Func<Task>[] taskFuncs, Func<Task<T>> resultFunc, Func<T, TR> translateFunc, TimeSpan timeSpan, CancellationToken cancellationToken, Action cencelAction, Action closeAction, Action completedAction)
-        {
-            var helper = new Helper(timeSpan, cancellationToken, cencelAction, closeAction, completedAction);
-
-            return CreateTimeOutTaskAsync(taskFuncs, resultFunc, translateFunc, helper);
-        }
-
-    }
-
-    
 
     sealed class MHttpStreamPack
     {
@@ -448,29 +277,23 @@ namespace LeiKaiFeng.Http
             ConnectTimeOut = NeverTimeOutTimeSpan;
         }
 
-        void CreateNewConnectAsync(Socket socket, Uri uri, out Func<Task>[] taskFuncs, out Func<Task<Stream>> resultFunc)
+        async Task<Stream> CreateNewConnectAsync(Socket socket, Uri uri)
         {
-            taskFuncs = new Func<Task>[] { () => m_handler.ConnectCallback(socket, uri) };
+            await m_handler.ConnectCallback(socket, uri).ConfigureAwait(false);
 
-            resultFunc = () => m_handler.AuthenticateCallback(new NetworkStream(socket, true), uri);
-           
+            return await m_handler.AuthenticateCallback(new NetworkStream(socket, true), uri).ConfigureAwait(false);
         }
 
         Task<MHttpStreamPack> CreateNewConnectAsync(Uri uri, CancellationToken cancellationToken)
         {
             Socket socket = new Socket(m_handler.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
 
-            CreateNewConnectAsync(socket, uri, out var taskFuncs, out var resultFunc);
-
-            return MyCanell.CreateTimeOutTaskAsync(
-                taskFuncs,
-                resultFunc,
+            return TimeOutAndCancelAsync(
+                CreateNewConnectAsync(socket, uri),
                 (stream) => new MHttpStreamPack(new MHttpStream(socket, stream), m_handler.MaxOneStreamRequestCount),
+                socket.Close,
                 ConnectTimeOut,
-                cancellationToken,
-                socket.Close,
-                socket.Close,
-                () => { });
+                cancellationToken);
         }
 
 
