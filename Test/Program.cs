@@ -14,19 +14,18 @@ namespace Test
         static async Task TestString(MHttpClient client)
         {
            
-            foreach (var item in Enumerable.Range(1, 27))
+            foreach (var item in Enumerable.Range(1, 3))
             {
 
                 try
                 {
-                    string s = await client.GetStringAsync(new Uri("https://yandere.pp.ua/post/popular_by_day?day=" + item + "&month=1&year=2021"), CancellationToken.None);
+                    //string s = await client.GetStringAsync(new Uri("https://yandere.pp.ua/post/popular_by_day?day=" + item + "&month=1&year=2021"), CancellationToken.None);
 
-                    Regex regex = new Regex(@"<a class=""directlink (?:largeimg|smallimg)"" href=""([^""]+)""");
+                    //Regex regex = new Regex(@"<a class=""directlink (?:largeimg|smallimg)"" href=""([^""]+)""");
 
+                    string s = await client.GetStringAsync(new Uri("https://cn.bing.com/"), CancellationToken.None);
 
-
-
-                    Console.WriteLine(regex.Matches(s).Count);
+                    //Console.WriteLine(s.Length);
                 }
                 catch (MHttpClientException e)
                 when(e.InnerException is OperationCanceledException)
@@ -45,11 +44,13 @@ namespace Test
 
             MHttpClient client = new MHttpClient();
 
-            client.ConnectTimeOut = new TimeSpan(0, 0, 2);
+            client.ConnectTimeOut = new TimeSpan(0, 0, 6);
+
+            client.ResponseTimeOut = new TimeSpan(0, 0, 2);
 
             var list = new List<Task>();
 
-            foreach (var item in Enumerable.Range(0, 6)) 
+            foreach (var item in Enumerable.Range(0, 256)) 
             {
                 list.Add(TestString(client));
             }
@@ -64,7 +65,7 @@ namespace Test
 
                 File.AppendAllText("log.txt", $"{e}{s}{s}");
             }
-
+            Console.WriteLine("over");
             Console.ReadLine();
             
         }

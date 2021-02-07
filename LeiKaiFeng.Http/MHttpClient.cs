@@ -88,17 +88,32 @@ namespace LeiKaiFeng.Http
             return SendAsync(sendRequestFunc, setPoolFunc, new ResponsePack(token, timeSpan, maxResponseSize));
         }
 
-        async Task<MHttpResponse> SendAsync(Func<MHttpStream, Task> sendRequestFunc, Func<MHttpStreamPack,bool> setPoolFunc, ResponsePack taskPack)
+        
+
+        Task<MHttpResponse> SendAsync(Func<MHttpStream, Task> sendRequestFunc, Func<MHttpStreamPack,bool> setPoolFunc, ResponsePack taskPack)
         {
-            await sendRequestFunc(m_stream).ConfigureAwait(false);
+            async Task func()
+            {
+                try
+                {
+                    await sendRequestFunc(m_stream).ConfigureAwait(false);
 
-            await m_channelWriter.WriteAsync(taskPack).ConfigureAwait(false);
+                    await m_channelWriter.WriteAsync(taskPack).ConfigureAwait(false);
 
-            ReadResponse();
+                    ReadResponse();
 
-            setPoolFunc(this);
+                    setPoolFunc(this);
+                }
+                catch(Exception e)
+                {
+                    taskPack.Send(e);
+                }         
+            }
 
-            return await taskPack.Task.ConfigureAwait(false);
+
+            func();
+
+            return taskPack.Task;
         }
 
 
@@ -121,7 +136,7 @@ namespace LeiKaiFeng.Http
             {
                 if (!m_channelReader.TryRead(out var taskPack))
                 {
-                    throw new NotImplementedException("内部出错");
+                    throw new NotImplementedException("内部错误");
                 }
                 else
                 {
@@ -317,7 +332,7 @@ namespace LeiKaiFeng.Http
 
                 var requsetFunc = request.CreateSendAsync();
                 
-                Task<MHttpResponse> func() => pack.SendAsync(requsetFunc, (item) => m_pool.Set(uri, item), ConnectTimeOut, cancellationToken, m_handler.MaxResponseSize);
+                Task<MHttpResponse> func() => pack.SendAsync(requsetFunc, (item) => m_pool.Set(uri, item), ResponseTimeOut, cancellationToken, m_handler.MaxResponseSize);
 
                 while (m_pool.Get(uri, out pack))
                 {
@@ -333,6 +348,7 @@ namespace LeiKaiFeng.Http
                     catch(ObjectDisposedException)
                     {
                     }
+                    
                 }
 
                 pack = await CreateNewConnectAsync(uri, cancellationToken).ConfigureAwait(false);
