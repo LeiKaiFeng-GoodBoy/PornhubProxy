@@ -10,6 +10,17 @@ using System.Buffers.Text;
 namespace LeiKaiFeng.Http
 {
 
+    [Serializable]
+    public sealed class MHttpStreamException : Exception
+    {
+
+        public MHttpStreamException(string message) : base(message)
+        {
+
+        }
+    }
+
+
     //从索引0-UsedOffset是没有使用的字节数
     //从索引UsedOffset-ReadOffset是已经读取的字节数
     //从索引ReadOffset-MaxOffset是可以读取的字节数
@@ -63,7 +74,7 @@ namespace LeiKaiFeng.Http
 
             if (used_size >= SIZE)
             {
-                throw new MHttpException("无法在有限的缓冲区中找到协议的边界，请增大缓冲区重试");
+                throw new MHttpStreamException("无法在有限的缓冲区中找到协议的边界，请增大缓冲区重试");
             }
             else
             {
@@ -159,7 +170,7 @@ namespace LeiKaiFeng.Http
                 }
                 else
                 {
-                    throw new MHttpException("Chunked Length Is Error");
+                    throw new MHttpStreamException("Chunked Length Is Error");
                 }
                 
             }
@@ -230,7 +241,7 @@ namespace LeiKaiFeng.Http
 
             if (!Pf.EndWith(buffer, checked((int)stream.Position), s_mark))
             {
-                throw new MHttpException("Chunked数据的结尾标记错误");
+                throw new MHttpStreamException("Chunked数据的结尾标记错误");
             }
         }
 
@@ -335,7 +346,7 @@ namespace LeiKaiFeng.Http
 
                 if(memoryStream.Position > maxContentSize)
                 {
-                    throw new MHttpException("内容长度大于限制长度");
+                    throw new MHttpStreamException("内容长度大于限制长度");
                 }
             }
         }
@@ -344,7 +355,7 @@ namespace LeiKaiFeng.Http
         {
             if (length > maxContentSize || length < 0)
             {
-                throw new MHttpException("内容长度大于限制长度");
+                throw new MHttpStreamException("内容长度大于限制长度");
             }
             else if (length == 0)
             {
@@ -371,7 +382,7 @@ namespace LeiKaiFeng.Http
 
                 if (sumLength > maxContentSize)
                 {
-                    throw new MHttpException("内容长度大于限制长度");
+                    throw new MHttpStreamException("内容长度大于限制长度");
                 }
                 else
                 {
@@ -445,7 +456,7 @@ namespace LeiKaiFeng.Http
 
             if (index == -1)
             {
-                throw new MHttpException("解析HTTP头出错");
+                throw new MHttpStreamException("解析HTTP头出错");
             }
             else
             {
@@ -466,7 +477,7 @@ namespace LeiKaiFeng.Http
 
             if (index == -1)
             {
-                throw new MHttpException("解析HTTP头出错");
+                throw new MHttpStreamException("解析HTTP头出错");
             }
             else
             {

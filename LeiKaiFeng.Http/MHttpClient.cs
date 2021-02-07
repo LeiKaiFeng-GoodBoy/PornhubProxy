@@ -19,6 +19,15 @@ namespace LeiKaiFeng.Http
     }
 
 
+    [Serializable]
+    public sealed class MHttpClientException : Exception
+    {
+        public MHttpClientException(Exception e) : base(string.Empty, e)
+        {
+
+        }
+    }
+
     sealed class MHttpStreamPack
     {
         sealed class ResponsePack
@@ -217,13 +226,12 @@ namespace LeiKaiFeng.Http
         {
             LinkedTimeOutAndCancel(timeOutSpan, token, cancelAction, out var outToken, out var closeAction);
             
-            async Task<TR> F()
+            async Task<TR> func()
             {
+                T v;
                 try
                 {
-                    T v = await task.ConfigureAwait(false);
-
-                    return translateFunc(v);
+                    v = await task.ConfigureAwait(false);     
                 }
                 catch(Exception e)
                 {
@@ -240,10 +248,12 @@ namespace LeiKaiFeng.Http
                 {
                     closeAction();
                 }
+
+                return translateFunc(v);
             }
 
 
-            return F();
+            return func();
         }
 
 
