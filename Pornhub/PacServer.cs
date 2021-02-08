@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Net;
 
-namespace Pornhub
+namespace LeiKaiFeng.Pornhub
 {
     public sealed class PacServer
     {
@@ -109,7 +109,11 @@ namespace Pornhub
             return (hosts, endPoint);
         }
 
-        public static Uri Start(IPEndPoint server, params (string[] hosts, IPEndPoint endPoint)[] values)
+        public Uri ProxyUri { get; private set; }
+
+        public Task Task { get; private set; }
+
+        public static PacServer Start(IPEndPoint server, params (string[] hosts, IPEndPoint endPoint)[] values)
         {
             Uri uri = new Uri($"http://{server.Address}:{server.Port}/proxy.pac");
 
@@ -123,9 +127,16 @@ namespace Pornhub
 
             socket.Listen(6);
 
-            Task.Run(() => While(socket, buffer));
 
-            return uri;
+
+            return new PacServer
+            {
+                ProxyUri = uri,
+
+                Task = Task.Run(() => While(socket, buffer))
+            };
+        
+
         }
 
     }

@@ -13,7 +13,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using LeiKaiFeng.Http;
-using Pornhub;
+using LeiKaiFeng.Pornhub;
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
 
@@ -125,11 +125,11 @@ namespace PornhubProxy
 
             IPEndPoint endPoint = new IPEndPoint(IPAddress.Loopback, 1080);
 
-            Uri uri = PacServer.Start(new IPEndPoint(IPAddress.Loopback, 8080),
+            PacServer pacServer = PacServer.Start(new IPEndPoint(IPAddress.Loopback, 8080),
                 PacServer.Create(endPoint, "cn.pornhub.com", "hw-cdn2.adtng.com", "ht-cdn2.adtng.com", "vz-cdn2.adtng.com"),
                 PacServer.Create(new IPEndPoint(IPAddress.Loopback, 80), "www.pornhub.com", "hubt.pornhub.com"));
 
-            SetProxy.Set(uri);
+            SetProxy.Set(pacServer.ProxyUri);
 
             PornhubProxyInfo info = new PornhubProxyInfo
             {

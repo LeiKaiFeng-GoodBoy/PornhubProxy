@@ -6,7 +6,7 @@ using System.Threading.Channels;
 using System.Threading.Tasks;
 using LeiKaiFeng.Http;
 
-namespace Pornhub
+namespace LeiKaiFeng.Pornhub
 {
     sealed class GetPornhubMainHtml
     {

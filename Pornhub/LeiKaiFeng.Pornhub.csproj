@@ -5,11 +5,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="LeiKaiFeng.Http" Version="1.4.9" />
     <PackageReference Include="System.Threading.Channels" Version="5.0.0" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\LeiKaiFeng.Http\LeiKaiFeng.Http.csproj" />
   </ItemGroup>
 
 </Project>
