@@ -19,64 +19,48 @@ namespace Pornhub
     //并且所有观察都基于PC端页面，移动端没有测试，所以强制发送PC端User-Agent
     //综上所述，仅仅简单代理网站主HTML页面，视频，图片内容都可以正常访问
 
+    public sealed class PornhubProxyInfo
+    {
+        public byte[] ADVideoBytes { get; set; }
+
+        public Func<NetworkStream, string, Task<Stream>> ADPageStreamCreate { get; set; }
+
+        public Func<NetworkStream, string, Task<Stream>> MainPageStreamCreate { get; set; }
+
+        public int MaxContentSize { get; set; }
+
+        public int MaxRefreshRequestCount { get; set; }
+
+        public Func<string, string> ReplaceResponseHtml { get; set; }
+
+        public Func<string, bool> CheckingVideoHtml { get; set; }
+
+        public Func<Task<MHttpStream>> RemoteStreamCreate { get; set; }
+    }
+
     public sealed class PornhubProxyServer
     {
+        const string MAIN_HOST = "cn.pornhub.com";
+
+        const string AD_HOST = "adtng.com";
+
         readonly Tuple<string, X509Certificate2, Func<MHttpStream, Task>>[] m_tuples;
 
         readonly GetPornhubMainHtml m_getMainHtml;
 
-        readonly Func<Socket, Tuple<string, X509Certificate2, Func<MHttpStream, Task>>[], Task> m_createLocalConccet;
+        readonly PornhubProxyInfo m_info;
 
-        readonly int m_maxContectSize;
-
-        readonly int m_maxRefreshRequestCount;
-
-        readonly byte[] m_ad_video_buffer = File.ReadAllBytes("985106_video_with_sound.mp4");
-
-        public PornhubProxyServer(X509Certificate2 pcer, X509Certificate2 adcer, Func<Task<MHttpStream>> createRemoteConccet, Func<Socket, Tuple<string, X509Certificate2, Func<MHttpStream, Task>>[], Task> createLocalConccet, int maxResponseSize, int concurrentConccetCount, int maxRefreshRequestCount)
+        public PornhubProxyServer(PornhubProxyInfo info)
         {
-            m_tuples = new Tuple<string, X509Certificate2, Func<MHttpStream, Task>>[]
-            {
-                Tuple.Create<string, X509Certificate2, Func<MHttpStream, Task>>("cn.pornhub.com", pcer, MainBodyAsync),
+            m_info = info;
 
-                Tuple.Create<string, X509Certificate2, Func<MHttpStream, Task>>("adtng.com", adcer, AdAsync),
-            };
-
-            
-            m_getMainHtml = GetPornhubMainHtml.Create(createRemoteConccet, concurrentConccetCount, maxResponseSize);
-
-            m_createLocalConccet = createLocalConccet;
+            m_getMainHtml = GetPornhubMainHtml.Create(m_info.RemoteStreamCreate, 6, m_info.MaxContentSize);
 
 
-            m_maxContectSize = maxResponseSize;
-           
-
-            m_maxRefreshRequestCount = maxRefreshRequestCount;
         }
 
 
-        static string ReplaceResponseHtml(string html)
-        {
-            return html;
-
-            //return new StringBuilder(html)
-            //    .Replace("ci.", "ei.")
-            //    .Replace("di.", "ei.")
-            //    .ToString();
-        }
-
-        static bool CheckingVideoHtml(string html)
-        {
-            if (html.Contains("/ev-h.p") ||
-                html.Contains("/ev.p"))
-            {
-                return true;
-            }
-            else
-            {
-                return false;
-            }
-        }
+        
 
 
         static Func<MHttpStream, Task> CreateSendFunc(MHttpRequest request)
@@ -91,9 +75,9 @@ namespace Pornhub
             return request.CreateSendAsync();
         }
 
-        static Task SendResponse(MHttpResponse response, string html, MHttpStream local)
+        Task SendResponse(MHttpResponse response, string html, MHttpStream local)
         {
-            html = ReplaceResponseHtml(html);
+            html = m_info.ReplaceResponseHtml(html);
 
             response.Headers.RemoveHopByHopHeaders();
 
@@ -144,7 +128,7 @@ namespace Pornhub
 
                 string html = response.Content.GetString();
 
-                if (CheckingVideoHtml(html))
+                if (m_info.CheckingVideoHtml(html))
                 {
                     source.TrySetResult(() => SendResponse(response, html, local));
                 }
@@ -173,7 +157,7 @@ namespace Pornhub
             };
             
 
-            foreach (var item in Enumerable.Range(0, m_maxRefreshRequestCount))
+            foreach (var item in Enumerable.Range(0, m_info.MaxRefreshRequestCount))
             {
                 list.Add(Task.Run(createOneRequest));
             }
@@ -188,7 +172,7 @@ namespace Pornhub
 
                 var response = MHttpResponse.Create(200);
 
-                response.SetContent(m_ad_video_buffer);
+                response.SetContent(m_info.ADVideoBytes);
 
                 await response.SendAsync(localStream).ConfigureAwait(false);
 
@@ -209,7 +193,7 @@ namespace Pornhub
                 while (true)
                 {
 
-                    MHttpRequest request = await MHttpRequest.ReadAsync(localStream, m_maxContectSize).ConfigureAwait(false);
+                    MHttpRequest request = await MHttpRequest.ReadAsync(localStream, m_info.MaxContentSize).ConfigureAwait(false);
 
                     var sendFunc = CreateSendFunc(request);
 
@@ -231,16 +215,58 @@ namespace Pornhub
             
         }
 
+
+        static string GetHost(byte[] buffer, int offset, int count)
+        {
+            string s = Encoding.UTF8.GetString(buffer, offset, count);
+
+            return s.Split(new string[] { "\r\n" }, 2, StringSplitOptions.RemoveEmptyEntries)[0].Split(new char[] { ' ' }, 3, StringSplitOptions.RemoveEmptyEntries)[1].Split(new char[] { ':' }, 2, StringSplitOptions.RemoveEmptyEntries)[0];
+        }
+
+        static async Task<string> Init(Stream stream)
+        {
+            byte[] buffer = new byte[1024];
+
+            int count = await stream.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
+
+            string host = GetHost(buffer, 0, count);
+
+            buffer = Encoding.UTF8.GetBytes("HTTP/1.1 200 OK\r\n\r\n");
+
+            await stream.WriteAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
+
+            return host;
+        }
+
+
         async Task Conccet(Socket socket)
         {
 
             
             try
             {
+                NetworkStream netWorkStream = new NetworkStream(socket, true);
 
-                await m_createLocalConccet(socket, m_tuples).ConfigureAwait(false);
 
-                
+                string host = await Init(netWorkStream).ConfigureAwait(false);
+
+                Console.WriteLine(host);
+                if (host.EndsWith(MAIN_HOST))
+                {
+                    Stream stream = await m_info.MainPageStreamCreate(netWorkStream, host).ConfigureAwait(false);
+
+                    await MainBodyAsync(new MHttpStream(socket, stream)).ConfigureAwait(false);
+                }
+                else if (host.EndsWith(AD_HOST))
+                {
+                    Stream stream = await m_info.ADPageStreamCreate(netWorkStream, host).ConfigureAwait(false);
+
+                    await AdAsync(new MHttpStream(socket, stream)).ConfigureAwait(false);
+                }
+                else
+                {
+
+                }
 
             }
             catch (Exception e)
