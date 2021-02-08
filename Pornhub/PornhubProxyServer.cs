@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using LeiKaiFeng.Http;
 using System.Linq;
 using System.Threading;
+using System.Net;
 
 namespace Pornhub
 {
@@ -43,8 +44,6 @@ namespace Pornhub
         const string MAIN_HOST = "cn.pornhub.com";
 
         const string AD_HOST = "adtng.com";
-
-        readonly Tuple<string, X509Certificate2, Func<MHttpStream, Task>>[] m_tuples;
 
         readonly GetPornhubMainHtml m_getMainHtml;
 
@@ -250,7 +249,7 @@ namespace Pornhub
 
                 string host = await Init(netWorkStream).ConfigureAwait(false);
 
-                Console.WriteLine(host);
+               
                 if (host.EndsWith(MAIN_HOST))
                 {
                     Stream stream = await m_info.MainPageStreamCreate(netWorkStream, host).ConfigureAwait(false);
@@ -277,9 +276,36 @@ namespace Pornhub
             }
         }
 
-        public Task Add(Socket socket)
+        void Add(Socket socket)
         {
-            return Task.Run(() => Conccet(socket));
+            Task.Run(() => Conccet(socket));
+        }
+
+
+        public Task Start(IPEndPoint endPoint)
+        {
+            Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+
+            socket.Bind(endPoint);
+
+            socket.Listen(6);
+
+
+            return Task.Run(async () =>
+            {
+                while (true)
+                {
+                    Console.WriteLine("one link");
+                    var one = await socket.AcceptAsync().ConfigureAwait(false);
+
+                    Add(one);
+
+
+                }
+
+            });
+
         }
     }
 }
