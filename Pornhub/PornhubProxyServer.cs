@@ -9,6 +9,7 @@ using LeiKaiFeng.Http;
 using System.Linq;
 using System.Threading;
 using System.Net;
+using System.Threading.Channels;
 
 namespace LeiKaiFeng.Pornhub
 {
@@ -45,7 +46,7 @@ namespace LeiKaiFeng.Pornhub
 
         const string AD_HOST = "adtng.com";
 
-        readonly GetPornhubMainHtml m_getMainHtml;
+        readonly ChannelWriter<RequestPack> m_getMainHtml;
 
         readonly PornhubProxyInfo m_info;
 
@@ -53,9 +54,18 @@ namespace LeiKaiFeng.Pornhub
         {
             m_info = info;
 
-            m_getMainHtml = GetPornhubMainHtml.Create(m_info.RemoteStreamCreate, 6, m_info.MaxContentSize);
 
 
+            m_getMainHtml = MHttpStreamPack.Create(new MHttpClientHandler
+            {
+                StreamCallback = (uri, handle, token) => m_info.RemoteStreamCreate(),
+
+                MaxStreamPoolCount = 6,
+
+                MaxResponseContentSize = m_info.MaxContentSize
+
+
+            }, new Uri("http://cn.pornhub.com/"));
         }
 
 
@@ -91,11 +101,17 @@ namespace LeiKaiFeng.Pornhub
         async Task<MHttpResponse> GetResponseAsync(Func<MHttpStream, Task> func)
         {
 
+
+
             while (true)
             {
                 try
                 {
-                    return await m_getMainHtml.SendAsync(func).ConfigureAwait(false);
+                    var pack = new RequestPack(CancellationToken.None, func);
+
+                    await m_getMainHtml.WriteAsync(pack).ConfigureAwait(false);
+
+                    return await pack.Task.ConfigureAwait(false);
 
                 }
                 catch (IOException)
