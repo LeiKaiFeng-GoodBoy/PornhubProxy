@@ -312,7 +312,7 @@ namespace LeiKaiFeng.Pornhub
             {
                 while (true)
                 {
-                    Console.WriteLine("one link");
+            
                     var one = await socket.AcceptAsync().ConfigureAwait(false);
 
                     Add(one);
