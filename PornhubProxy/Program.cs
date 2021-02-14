@@ -81,8 +81,8 @@ namespace PornhubProxy
         public static async Task<MHttpStream> CreateRemoteStream()
         {
           
-            //const string HOST = "www.livehub.com";
-            const string HOST = "cn.pornhub.com";
+            const string HOST = "www.livehub.com";
+            //const string HOST = "cn.pornhub.com";
 
             Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 
@@ -91,7 +91,7 @@ namespace PornhubProxy
             SslStream sslStream = new SslStream(new NetworkStream(socket, true), false, (a, b, c, d) => true);
 
 
-            await sslStream.AuthenticateAsClientAsync("", null, System.Security.Authentication.SslProtocols.Tls12, false).ConfigureAwait(false);
+            await sslStream.AuthenticateAsClientAsync(HOST, null, System.Security.Authentication.SslProtocols.Tls12, false).ConfigureAwait(false);
 
             return new MHttpStream(socket, sslStream);
         }
