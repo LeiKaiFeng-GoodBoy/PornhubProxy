@@ -45,6 +45,7 @@ namespace PornhubProxy
             RegistryKey registryKey = OpenKey();
             
             registryKey.SetValue("AutoConfigURL", uri.AbsoluteUri);
+            //registryKey.SetValue("ProxyEnable", 0);
 
             FlushOs();
         }
