@@ -118,7 +118,10 @@ namespace LeiKaiFeng.Pornhub
                 {
                     
                 }
-
+                catch (MHttpStreamException)
+                {
+                    //这个地方主要是因为服务器返回的408响应没有长度,通过断开连接指示长度,相关的逻辑没有写
+                }
             }
         }
 
