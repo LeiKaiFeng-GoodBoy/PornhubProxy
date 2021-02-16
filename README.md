@@ -1,3 +1,5 @@
+此项目用到了一个我自己写的一个库 https://github.com/LeiKaiFeng-GoodBoy/LeiKaiFeng.Http
+
 下载页面https://github.com/LeiKaiFeng-GoodBoy/PornhubProxy/releases
 
 启发项目
@@ -16,7 +18,11 @@ https://github.com/mashirozx/Pixiv-Nginx
 3.在浏览器中访问链接(注意是HTTPS) https://cn.pornhub.com/
 
 
+我对前端不了解,去不掉视频播放时的广告,但是广告加载又很慢,所以我缓存了一个广告在安装包里
+
 代码写的很糟糕,所以简单的说一下原理
+
+简单的说就是绕过SNI(服务器名称指定协议)审查,可以自行搜索SNI审查,有好多好东西,在实践中一般SNI发送空的或者ip地址服务器也会返回一个默认证书,主要看客户端是否同意继续建立连接
 
 我们知道一个服务器上,或者说一个ip地址上,可以托管不止一个网站,在HTTP协议中通过Host请求头来分别，现如今大多数网站都支TLS加密，建立加密链接后才会传输HTTP协议内容，但是建立TLS需要验证服务器证书，所以TLS握手协议添加了一个扩展字段用于客户端向服务器表明要验证哪个网站的证书
 
