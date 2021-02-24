@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="LeiKaiFeng.Http" Version="1.5.9" />
+    <PackageReference Include="LeiKaiFeng.Http" Version="1.6.0" />
     <PackageReference Include="System.Threading.Channels" Version="5.0.0" />
   </ItemGroup>
 
