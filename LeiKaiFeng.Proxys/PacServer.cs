@@ -42,13 +42,13 @@ namespace LeiKaiFeng.Pornhub
         {
             StringBuilder sb = new StringBuilder();
 
-            foreach (var item in values)
+            foreach (var (hosts, endPoint) in values)
             {
-                string s = CreateIf(p, item.hosts);
+                string s = CreateIf(p, hosts);
 
 
 
-                sb.Append(CreateIfBlack(s, item.endPoint));
+                sb.Append(CreateIfBlack(s, endPoint));
             }
 
 
@@ -109,14 +109,16 @@ namespace LeiKaiFeng.Pornhub
             return (hosts, endPoint);
         }
 
-        public Uri ProxyUri { get; private set; }
-
         public Task Task { get; private set; }
+
+        public static Uri CreatePacUri(IPEndPoint endPoint)
+        {
+            return new Uri($"http://{endPoint.Address}:{endPoint.Port}/proxy.pac");
+        }
 
         public static PacServer Start(IPEndPoint server, params (string[] hosts, IPEndPoint endPoint)[] values)
         {
-            Uri uri = new Uri($"http://{server.Address}:{server.Port}/proxy.pac");
-
+           
             string s = CreatePac(values);
 
             byte[] buffer = Encoding.UTF8.GetBytes($"HTTP/1.1 200 OK\r\nContent-Length: {Encoding.UTF8.GetBytes(s)}\r\nContent-Type: {PAC_CONTENT_TYPE}\r\n\r\n{s}");
@@ -131,8 +133,7 @@ namespace LeiKaiFeng.Pornhub
 
             return new PacServer
             {
-                ProxyUri = uri,
-
+               
                 Task = Task.Run(() => While(socket, buffer))
             };
         

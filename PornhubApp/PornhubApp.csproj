@@ -10,6 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\LeiKaiFeng.X509Certificates\LeiKaiFeng.X509Certificates.csproj" />
     <ProjectReference Include="..\Pornhub\LeiKaiFeng.Pornhub.csproj" />
   </ItemGroup>
 

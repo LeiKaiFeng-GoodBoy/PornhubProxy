@@ -10,4 +10,8 @@
     <PackageReference Include="System.Threading.Channels" Version="5.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\LeiKaiFeng.Proxys\LeiKaiFeng.Proxys.csproj" />
+  </ItemGroup>
+
 </Project>

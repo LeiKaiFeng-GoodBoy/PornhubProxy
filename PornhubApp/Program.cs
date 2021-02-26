@@ -18,6 +18,7 @@ using System.Runtime.InteropServices;
 using Microsoft.Win32;
 using System.Collections.ObjectModel;
 using System.Security.Cryptography;
+using LeiKaiFeng.X509Certificates;
 
 namespace PornhubProxy
 {
@@ -114,70 +115,6 @@ namespace PornhubProxy
         }
     }
 
-
-    public static class TLSCertificate
-    {
-
-        static X509Extension CreateSubAltName(string[] subjectAltNames)
-        {
-            var builder = new SubjectAlternativeNameBuilder();
-
-            Array.ForEach(subjectAltNames, (s) => builder.AddDnsName(s));
-
-            return builder.Build(false);
-        }
-
-        static void AddExtension(Collection<X509Extension> extensions, string[] subjectAltNames)
-        {
-
-
-            extensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.KeyEncipherment | X509KeyUsageFlags.DataEncipherment, false));
-            extensions.Add(new X509BasicConstraintsExtension(false, true, 0, false));
-            extensions.Add(CreateSubAltName(subjectAltNames));
-        }
-
-        public static X509Certificate2 CreateTlsCertificate(string commonName, X509Certificate2 caCertificate, int keySize, int days, params string[] subjectAltNames)
-        {
-            string subjectName = $"CN = {commonName}";
-
-            var rsa = RSA.Create(keySize);
-
-            var certificateRequest = new CertificateRequest(subjectName, rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-
-            AddExtension(certificateRequest.CertificateExtensions, subjectAltNames);
-
-
-
-            var dateTime = DateTime.UtcNow;
-
-
-
-            X509Certificate2 tlsCertificate = certificateRequest.Create(caCertificate, new DateTimeOffset(dateTime), new DateTimeOffset(dateTime.AddDays(days)), caCertificate.GetCertHash().Take(20).ToArray());
-
-            return new X509Certificate2(tlsCertificate.CopyWithPrivateKey(rsa).Export(X509ContentType.Pfx), string.Empty, X509KeyStorageFlags.Exportable);
-        }
-
-
-        public static X509Certificate2 CreateCA(string commonName, int keySize, int days)
-        {
-            string subjectName = $"CN = {commonName}";
-
-            var rsa = RSA.Create(keySize);
-
-
-
-            var certificateRequest = new CertificateRequest(subjectName, rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-
-            certificateRequest.CertificateExtensions.Add(new X509BasicConstraintsExtension(true, true, 1, true));
-
-            var dateTime = DateTime.UtcNow;
-
-            return certificateRequest.CreateSelfSigned(new DateTimeOffset(dateTime), new DateTimeOffset(dateTime.AddDays(days)));
-
-        }
-
-    }
-
     class Program
     {
         static void Main(string[] args)
@@ -186,11 +123,12 @@ namespace PornhubProxy
 
             IPEndPoint endPoint = new IPEndPoint(IPAddress.Loopback, 1080);
 
-            PacServer pacServer = PacServer.Start(new IPEndPoint(IPAddress.Loopback, 8080),
+            IPEndPoint pac = new IPEndPoint(IPAddress.Loopback, 8080);
+            PacServer pacServer = PacServer.Start(pac,
                 PacServer.Create(endPoint, "cn.pornhub.com", "hw-cdn2.adtng.com", "ht-cdn2.adtng.com", "vz-cdn2.adtng.com"),
                 PacServer.Create(new IPEndPoint(IPAddress.Loopback, 80), "www.pornhub.com", "hubt.pornhub.com"));
 
-            SetProxy.Set(pacServer.ProxyUri);
+            SetProxy.Set(PacServer.CreatePacUri(pac));
 
             X509Certificate2 ca = new X509Certificate2("myCA.pfx");
 

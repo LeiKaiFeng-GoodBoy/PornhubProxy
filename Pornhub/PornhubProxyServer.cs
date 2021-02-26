@@ -10,6 +10,7 @@ using System.Linq;
 using System.Threading;
 using System.Net;
 using System.Threading.Channels;
+using LeiKaiFeng.Proxys;
 
 namespace LeiKaiFeng.Pornhub
 {
@@ -140,7 +141,7 @@ namespace LeiKaiFeng.Pornhub
 
             var source = new TaskCompletionSource<Func<Task>>();
 
-            Func<Task> createOneRequest = async () =>
+            async Task createOneRequest()
             {
                 MHttpResponse response = await GetResponseAsync(requset).ConfigureAwait(false);
 
@@ -150,10 +151,10 @@ namespace LeiKaiFeng.Pornhub
                 {
                     source.TrySetResult(() => SendResponse(response, html, local));
                 }
-               
-            };
 
-            Func<Task> sendFirstResponse = async () =>
+            }
+
+            async Task sendFirstResponse()
             {
                 Task allTask = Task.WhenAll(list.ToArray());
 
@@ -165,15 +166,15 @@ namespace LeiKaiFeng.Pornhub
                 if (object.ReferenceEquals(t, task))
                 {
                     var v = await task.ConfigureAwait(false);
-               
+
                     await v().ConfigureAwait(false);
                 }
                 else
                 {
                     await GetOneHtmlAsync(requset, local).ConfigureAwait(false);
                 }
-            };
-            
+            }
+
 
             foreach (var item in Enumerable.Range(0, m_info.MaxRefreshRequestCount))
             {
@@ -234,27 +235,6 @@ namespace LeiKaiFeng.Pornhub
         }
 
 
-        static string GetHost(byte[] buffer, int offset, int count)
-        {
-            string s = Encoding.UTF8.GetString(buffer, offset, count);
-
-            return s.Split(new string[] { "\r\n" }, 2, StringSplitOptions.RemoveEmptyEntries)[0].Split(new char[] { ' ' }, 3, StringSplitOptions.RemoveEmptyEntries)[1].Split(new char[] { ':' }, 2, StringSplitOptions.RemoveEmptyEntries)[0];
-        }
-
-        static async Task<string> Init(Stream stream)
-        {
-            byte[] buffer = new byte[1024];
-
-            int count = await stream.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
-
-            string host = GetHost(buffer, 0, count);
-
-            buffer = Encoding.UTF8.GetBytes("HTTP/1.1 200 OK\r\n\r\n");
-
-            await stream.WriteAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
-
-            return host;
-        }
 
 
         async Task Conccet(Socket socket)
@@ -266,9 +246,8 @@ namespace LeiKaiFeng.Pornhub
                 NetworkStream netWorkStream = new NetworkStream(socket, true);
 
 
-                string host = await Init(netWorkStream).ConfigureAwait(false);
-
-               
+                string host = await ConnectHelper.ReadConnectRequestAsync(netWorkStream, (stream, s) => s).ConfigureAwait(false);
+              
                 if (host.EndsWith(MAIN_HOST))
                 {
                     Stream stream = await m_info.MainPageStreamCreate(netWorkStream, host).ConfigureAwait(false);
@@ -287,11 +266,8 @@ namespace LeiKaiFeng.Pornhub
                 }
 
             }
-            catch (Exception e)
+            catch
             {
-                string s = Environment.NewLine;
-
-                //Console.WriteLine($"{s}{s}{e}{s}{s}");
             }
         }
 
