@@ -121,9 +121,11 @@ namespace PornhubProxy
         {
             AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException;
 
-            IPEndPoint endPoint = new IPEndPoint(IPAddress.Loopback, 1080);
+            var ip = Dns.GetHostAddresses(Dns.GetHostName()).Where((item) => item.AddressFamily == AddressFamily.InterNetwork).FirstOrDefault() ?? IPAddress.Loopback;
+            
+            IPEndPoint endPoint = new IPEndPoint(ip, 1080);
 
-            IPEndPoint pac = new IPEndPoint(IPAddress.Loopback, 8080);
+            IPEndPoint pac = new IPEndPoint(ip, 8080);
             PacServer pacServer = PacServer.Start(pac,
                 PacServer.Create(endPoint, "cn.pornhub.com", "hw-cdn2.adtng.com", "ht-cdn2.adtng.com", "vz-cdn2.adtng.com"),
                 PacServer.Create(new IPEndPoint(IPAddress.Loopback, 80), "www.pornhub.com", "hubt.pornhub.com"));
