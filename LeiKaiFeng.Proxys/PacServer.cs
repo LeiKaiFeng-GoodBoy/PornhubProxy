@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Net;
+using LeiKaiFeng.Http;
 
 namespace LeiKaiFeng.Pornhub
 {
@@ -72,16 +73,28 @@ namespace LeiKaiFeng.Pornhub
         }
 
 
-        static async Task RequestAsync(Socket socket, byte[] buffer)
+        static async Task RequestAsync(Socket socket, string s)
         {
 
             try
             {
-                await ReadRequestAsync(socket).ConfigureAwait(false);
+                MHttpStream stream = new MHttpStream(socket, new NetworkStream(socket, true));
 
-                await socket.SendAsync(new ArraySegment<byte>(buffer), SocketFlags.None).ConfigureAwait(false);
 
-                socket.Shutdown(SocketShutdown.Both);
+                await MHttpRequest.ReadAsync(stream, 1024*1024).ConfigureAwait(false);
+
+                MHttpResponse response = MHttpResponse.Create(200);
+
+
+                response.Headers.Set("Content-Type", PAC_CONTENT_TYPE);
+
+                response.SetContent(s);
+
+
+                await response.SendAsync(stream).ConfigureAwait(false);
+
+
+
             }
             catch (SocketException)
             {
@@ -93,14 +106,14 @@ namespace LeiKaiFeng.Pornhub
             }
         }
 
-        static async Task While(Socket socket, byte[] buffer)
+        static async Task While(Socket socket, string s)
         {
             while (true)
             {
 
                 Socket client = await socket.AcceptAsync().ConfigureAwait(false);
 
-                Task t = Task.Run(() => RequestAsync(client, buffer));
+                Task t = Task.Run(() => RequestAsync(client, s));
             }
         }
 
@@ -121,7 +134,7 @@ namespace LeiKaiFeng.Pornhub
            
             string s = CreatePac(values);
 
-            byte[] buffer = Encoding.UTF8.GetBytes($"HTTP/1.1 200 OK\r\nContent-Length: {Encoding.UTF8.GetBytes(s)}\r\nContent-Type: {PAC_CONTENT_TYPE}\r\n\r\n{s}");
+            //byte[] buffer = Encoding.UTF8.GetBytes($"HTTP/1.1 200 OK\r\nContent-Length: {Encoding.UTF8.GetBytes(s)}\r\nContent-Type: {PAC_CONTENT_TYPE}\r\n\r\n{s}");
 
             Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 
@@ -134,7 +147,7 @@ namespace LeiKaiFeng.Pornhub
             return new PacServer
             {
                
-                Task = Task.Run(() => While(socket, buffer))
+                Task = Task.Run(() => While(socket, s))
             };
         
 
