@@ -119,7 +119,9 @@ namespace PornhubProxy
     {
         static void Main(string[] args)
         {
-            AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException;
+            //AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException;
+
+            TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
 
             var ip = Dns.GetHostAddresses(Dns.GetHostName()).Where((item) => item.AddressFamily == AddressFamily.InterNetwork).FirstOrDefault() ?? IPAddress.Loopback;
             
@@ -163,6 +165,12 @@ namespace PornhubProxy
             Task t = server.Start(endPoint);
 
             t.Wait();
+        }
+
+        private static void TaskScheduler_UnobservedTaskException(object sender, UnobservedTaskExceptionEventArgs e)
+        {
+            string s = Environment.NewLine;
+            Console.WriteLine($"{s}{s}{e.Exception}{s}{s}");
         }
 
         private static void CurrentDomain_FirstChanceException(object sender, System.Runtime.ExceptionServices.FirstChanceExceptionEventArgs e)

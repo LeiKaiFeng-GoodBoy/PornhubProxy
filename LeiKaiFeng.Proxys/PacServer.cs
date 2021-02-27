@@ -68,29 +68,20 @@ namespace LeiKaiFeng.Pornhub
 
         static async Task RequestAsync(Socket socket, string s)
         {
-
-            try
-            {
-                MHttpStream stream = new MHttpStream(socket, new NetworkStream(socket, true));
+            MHttpStream stream = new MHttpStream(socket, new NetworkStream(socket, true));
 
 
-                await MHttpRequest.ReadAsync(stream, 1024 * 1024).ConfigureAwait(false);
+            await MHttpRequest.ReadAsync(stream, 1024 * 1024).ConfigureAwait(false);
 
-                MHttpResponse response = MHttpResponse.Create(200);
-
-
-                response.Headers.Set("Content-Type", PAC_CONTENT_TYPE);
-
-                response.SetContent(s);
+            MHttpResponse response = MHttpResponse.Create(200);
 
 
-                await response.SendAsync(stream).ConfigureAwait(false);
-            }
-            catch (SocketException)
-            {
+            response.Headers.Set("Content-Type", PAC_CONTENT_TYPE);
 
-            }
-            
+            response.SetContent(s);
+
+
+            await response.SendAsync(stream).ConfigureAwait(false);
         }
 
         static async Task While(Socket socket, string s)
