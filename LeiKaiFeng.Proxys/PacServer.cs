@@ -65,13 +65,6 @@ namespace LeiKaiFeng.Pornhub
             return s;
         }
 
-        static Task ReadRequestAsync(Socket socket)
-        {
-            byte[] buffer = new byte[1024];
-
-            return socket.ReceiveAsync(new ArraySegment<byte>(buffer), SocketFlags.None);
-        }
-
 
         static async Task RequestAsync(Socket socket, string s)
         {
@@ -81,7 +74,7 @@ namespace LeiKaiFeng.Pornhub
                 MHttpStream stream = new MHttpStream(socket, new NetworkStream(socket, true));
 
 
-                await MHttpRequest.ReadAsync(stream, 1024*1024).ConfigureAwait(false);
+                await MHttpRequest.ReadAsync(stream, 1024 * 1024).ConfigureAwait(false);
 
                 MHttpResponse response = MHttpResponse.Create(200);
 
@@ -92,18 +85,12 @@ namespace LeiKaiFeng.Pornhub
 
 
                 await response.SendAsync(stream).ConfigureAwait(false);
-
-
-
             }
             catch (SocketException)
             {
 
             }
-            finally
-            {
-                socket.Close();
-            }
+            
         }
 
         static async Task While(Socket socket, string s)
@@ -133,8 +120,6 @@ namespace LeiKaiFeng.Pornhub
         {
            
             string s = CreatePac(values);
-
-            //byte[] buffer = Encoding.UTF8.GetBytes($"HTTP/1.1 200 OK\r\nContent-Length: {Encoding.UTF8.GetBytes(s)}\r\nContent-Type: {PAC_CONTENT_TYPE}\r\n\r\n{s}");
 
             Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 
