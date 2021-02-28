@@ -119,6 +119,19 @@ namespace PornhubProxy
     {
         static void Main(string[] args)
         {
+            Task.Run(async () =>
+            {
+
+                while (true)
+                {
+                    await Task.Delay(new TimeSpan(0, 0, 10)).ConfigureAwait(false);
+
+
+                    GC.Collect();
+                }
+
+            });
+
             //AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException;
 
             TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
