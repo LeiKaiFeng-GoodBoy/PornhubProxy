@@ -141,10 +141,15 @@ namespace PornhubProxy
             IPEndPoint endPoint = new IPEndPoint(ip, 1080);
 
             IPEndPoint pac = new IPEndPoint(ip, 8080);
-            PacServer pacServer = PacServer.Start(pac,
-                PacServer.Create(endPoint, "cn.pornhub.com", "hw-cdn2.adtng.com", "ht-cdn2.adtng.com", "vz-cdn2.adtng.com"),
-                PacServer.Create(new IPEndPoint(IPAddress.Loopback, 80), "www.pornhub.com", "hubt.pornhub.com"));
+            var lpp = new IPEndPoint(IPAddress.Loopback, 80);
 
+            PacServer pacServer = PacServer.Start(pac,
+                PacHelper.Create((host) => host == "www.pornhub.com", ProxyMode.CreateHTTP(lpp)),
+                PacHelper.Create((host) => host == "hubt.pornhub.com", ProxyMode.CreateHTTP(lpp)),
+                PacHelper.Create((host) => PacMethod.dnsDomainIs(host, "pornhub.com"), ProxyMode.CreateHTTP(endPoint)),
+                PacHelper.Create((host) => PacMethod.dnsDomainIs(host, "adtng.com"), ProxyMode.CreateHTTP(endPoint)));
+
+            
             SetProxy.Set(PacServer.CreatePacUri(pac));
 
             X509Certificate2 ca = new X509Certificate2("myCA.pfx");
