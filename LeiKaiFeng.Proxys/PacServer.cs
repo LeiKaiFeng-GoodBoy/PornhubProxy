@@ -225,7 +225,7 @@ namespace LeiKaiFeng.Pornhub
 
         static async Task RequestAsync(Socket socket, string s)
         {
-            MHttpStream stream = new MHttpStream(socket, new NetworkStream(socket, true));
+            MHttpStream stream = new MHttpStream(socket, new NetworkStream(socket, true), 1024);
 
 
             await MHttpRequest.ReadAsync(stream, 1024 * 1024).ConfigureAwait(false);
