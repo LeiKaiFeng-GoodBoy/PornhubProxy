@@ -52,6 +52,18 @@ namespace PornhubProxy
         }
 
 
+        static async Task CatchAsync(Task task)
+        {
+            try
+            {
+                await task.ConfigureAwait(false);
+            }
+            catch(Exception e)
+            {
+                Console.WriteLine(e);
+            }
+        }
+
         async Task Connect(Stream left_stream)
         {
 
@@ -59,9 +71,10 @@ namespace PornhubProxy
 
             var right_stream = await m_info.CreateRemoteStream().ConfigureAwait(false);
 
-            var t1 = left_stream.CopyToAsync(right_stream);
+            var t1 = left_stream.CopyToAsync(right_stream, 2048);
 
             var t2 = right_stream.CopyToAsync(left_stream);
+            
             await Task.WhenAny(t1, t2).ConfigureAwait(false);
 
 
@@ -69,7 +82,9 @@ namespace PornhubProxy
 
             right_stream.Close();
 
+            CatchAsync(t1);
 
+            CatchAsync(t2);
         }
 
         public Task Start()
