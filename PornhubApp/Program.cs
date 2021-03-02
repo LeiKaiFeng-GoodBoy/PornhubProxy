@@ -265,6 +265,7 @@ namespace PornhubProxy
             PacServer pacServer = PacServer.Start(pacListensEndPoint,
                 PacHelper.Create((host) => host == "www.pornhub.com", ProxyMode.CreateHTTP(adErrorEndpoint)),
                 PacHelper.Create((host) => host == "hubt.pornhub.com", ProxyMode.CreateHTTP(adErrorEndpoint)),
+                PacHelper.Create((host) => host == "ajax.googleapis.com", ProxyMode.CreateHTTP(adErrorEndpoint)),
                 PacHelper.Create((host) => PacMethod.dnsDomainIs(host, "pornhub.com"), ProxyMode.CreateHTTP(pornhubListensEndPoint)),
                 PacHelper.Create((host) => PacMethod.dnsDomainIs(host, "adtng.com"), ProxyMode.CreateHTTP(pornhubListensEndPoint)),
                 PacHelper.Create((host) => PacMethod.dnsDomainIs(host, IWARA_HOST), ProxyMode.CreateHTTP(iwaraLsitensPoint)));
