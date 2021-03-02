@@ -19,6 +19,7 @@ using Microsoft.Win32;
 using System.Collections.ObjectModel;
 using System.Security.Cryptography;
 using LeiKaiFeng.X509Certificates;
+using System.Security.Authentication;
 
 namespace PornhubProxy
 {
@@ -175,7 +176,7 @@ namespace PornhubProxy
         }
 
 
-        public static Func< Task<T>> CreateRemoteStream<T>(string host, int port, string sni, Func<Socket, SslStream, T> func)
+        public static Func<Task<T>> CreateRemoteStream<T>(string host, int port, string sni, Func<Socket, SslStream, T> func, SslProtocols sslProtocols = SslProtocols.None)
         {
             return async () =>
             {
@@ -183,10 +184,19 @@ namespace PornhubProxy
 
                 await socket.ConnectAsync(host, port).ConfigureAwait(false);
 
-                SslStream sslStream = new SslStream(new NetworkStream(socket, true), false, (a, b, c, d) => true);
+                SslStream sslStream = new SslStream(new NetworkStream(socket, true), false);
 
 
-                await sslStream.AuthenticateAsClientAsync(sni, null, System.Security.Authentication.SslProtocols.Tls12, false).ConfigureAwait(false);
+                var info = new SslClientAuthenticationOptions()
+                {
+                    RemoteCertificateValidationCallback = (a, b, c, d) => true,
+
+                    EnabledSslProtocols = sslProtocols,
+
+                    TargetHost = sni
+                };
+
+                await sslStream.AuthenticateAsClientAsync(info).ConfigureAwait(false);
 
                 return func(socket, sslStream);
             };
@@ -195,7 +205,7 @@ namespace PornhubProxy
            
         }
 
-        public static Func<Stream, string, Task<Stream>> CreateLocalStream(X509Certificate certificate)
+        public static Func<Stream, string, Task<Stream>> CreateLocalStream(X509Certificate certificate, SslProtocols sslProtocols = SslProtocols.None)
         {
             return async (stream, host) =>
             {
@@ -205,7 +215,7 @@ namespace PornhubProxy
                 {
                     ServerCertificate = certificate,
 
-                    EnabledSslProtocols = System.Security.Authentication.SslProtocols.Tls
+                    EnabledSslProtocols = sslProtocols
                 };
 
                 await sslStream.AuthenticateAsServerAsync(info).ConfigureAwait(false);
@@ -235,47 +245,44 @@ namespace PornhubProxy
             });
 
             //AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException;
+            //TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
+
 
             const string PORNHUB_HOST = "www.livehub.com";
-            //const string HOST = "cn.pornhub.com";
-
+            
             const string IWARA_HOST = "iwara.tv";
 
-            TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
-
+            
             var ip = Dns.GetHostAddresses(Dns.GetHostName()).Where((item) => item.AddressFamily == AddressFamily.InterNetwork).FirstOrDefault() ?? IPAddress.Loopback;
             
-            IPEndPoint endPoint = new IPEndPoint(ip, 1080);
-
-            IPEndPoint pac = new IPEndPoint(ip, 8080);
-            var lpp = new IPEndPoint(IPAddress.Loopback, 80);
-            var iwara = new IPEndPoint(ip, 6456);
-            PacServer pacServer = PacServer.Start(pac,
-                PacHelper.Create((host) => host == "www.pornhub.com", ProxyMode.CreateHTTP(lpp)),
-                PacHelper.Create((host) => host == "hubt.pornhub.com", ProxyMode.CreateHTTP(lpp)),
-                PacHelper.Create((host) => PacMethod.dnsDomainIs(host, "pornhub.com"), ProxyMode.CreateHTTP(endPoint)),
-                PacHelper.Create((host) => PacMethod.dnsDomainIs(host, "adtng.com"), ProxyMode.CreateHTTP(endPoint)),
-                PacHelper.Create((host) => PacMethod.dnsDomainIs(host, IWARA_HOST), ProxyMode.CreateHTTP(iwara)));
+            var pornhubListensEndPoint = new IPEndPoint(ip, 1080);
+            var pacListensEndPoint = new IPEndPoint(ip, 8080);
+            var adErrorEndpoint = new IPEndPoint(IPAddress.Loopback, 80);
+            var iwaraLsitensPoint = new IPEndPoint(ip, 6456);
+           
+            
+            PacServer pacServer = PacServer.Start(pacListensEndPoint,
+                PacHelper.Create((host) => host == "www.pornhub.com", ProxyMode.CreateHTTP(adErrorEndpoint)),
+                PacHelper.Create((host) => host == "hubt.pornhub.com", ProxyMode.CreateHTTP(adErrorEndpoint)),
+                PacHelper.Create((host) => PacMethod.dnsDomainIs(host, "pornhub.com"), ProxyMode.CreateHTTP(pornhubListensEndPoint)),
+                PacHelper.Create((host) => PacMethod.dnsDomainIs(host, "adtng.com"), ProxyMode.CreateHTTP(pornhubListensEndPoint)),
+                PacHelper.Create((host) => PacMethod.dnsDomainIs(host, IWARA_HOST), ProxyMode.CreateHTTP(iwaraLsitensPoint)));
 
             
-            SetProxy.Set(PacServer.CreatePacUri(pac));
+            SetProxy.Set(PacServer.CreatePacUri(pacListensEndPoint));
 
             X509Certificate2 ca = new X509Certificate2("myCA.pfx");
-
             X509Certificate2 mainCert = TLSCertificate.CreateTlsCertificate("pornhub.com", ca, 2048, 2, "pornhub.com", "*.pornhub.com");
             X509Certificate2 adCert = TLSCertificate.CreateTlsCertificate("adtng.com", ca, 2048, 2, "adtng.com", "*.adtng.com");
-
-            X509Certificate2 iwaraCert = TLSCertificate.CreateTlsCertificate("iwara.tv", ca, 2048, 2, "*.iwara.tv");
-
-            
+            X509Certificate2 iwaraCert = TLSCertificate.CreateTlsCertificate("iwara.tv", ca, 2048, 2900, "*.iwara.tv");
 
             PornhubProxyInfo info = new PornhubProxyInfo
             {
-                MainPageStreamCreate = Connect.CreateLocalStream(new X509Certificate2(mainCert)),
+                MainPageStreamCreate = Connect.CreateLocalStream(new X509Certificate2(mainCert), SslProtocols.Tls12),
 
-                ADPageStreamCreate = Connect.CreateLocalStream(new X509Certificate2(adCert)),
+                ADPageStreamCreate = Connect.CreateLocalStream(new X509Certificate2(adCert), SslProtocols.Tls12),
 
-                RemoteStreamCreate = Connect.CreateRemoteStream(PORNHUB_HOST, 443, PORNHUB_HOST,(a,b)=> new MHttpStream(a,b)),
+                RemoteStreamCreate = Connect.CreateRemoteStream(PORNHUB_HOST, 443, PORNHUB_HOST, (a, b) => new MHttpStream(a, b), SslProtocols.Tls12),
 
                 MaxContentSize = 1024 * 1024 * 5,
 
@@ -292,22 +299,19 @@ namespace PornhubProxy
             PornhubProxyServer server = new PornhubProxyServer(info);
 
 
-            Task t = server.Start(endPoint);
+            Task t1 = server.Start(pornhubListensEndPoint);
+
+            SniProxyInfo iwaraSniInfo = new SniProxyInfo(
+                iwaraLsitensPoint,
+                Connect.CreateLocalStream(iwaraCert, SslProtocols.Tls12),
+                Connect.CreateRemoteStream("104.20.27.25", 443, IWARA_HOST, (a, b) => (Stream)b, SslProtocols.Tls12));
 
 
+            SniProxy iwaraSniProxy = new SniProxy(iwaraSniInfo);
 
-            SniProxyInfo sniProxyInfo = new SniProxyInfo(
-                iwara,
-                Connect.CreateLocalStream(iwaraCert),
-                Connect.CreateRemoteStream("104.20.27.25", 443 ,  IWARA_HOST,(a, b) => (Stream)b)
-                );
+            Task t2 = iwaraSniProxy.Start();
 
-
-            SniProxy sniProxy = new SniProxy(sniProxyInfo);
-
-            sniProxy.Start();
-
-            Thread.Sleep(-1);
+            Task.WaitAll(t1, t2);
         }
 
         private static void TaskScheduler_UnobservedTaskException(object sender, UnobservedTaskExceptionEventArgs e)
