@@ -259,8 +259,9 @@ namespace PornhubProxy
             var pacListensEndPoint = new IPEndPoint(ip, 8080);
             var adErrorEndpoint = new IPEndPoint(IPAddress.Loopback, 80);
             var iwaraLsitensPoint = new IPEndPoint(ip, 6456);
-           
-            
+            var adVido = File.ReadAllBytes("ad.mp4");
+
+
             PacServer pacServer = PacServer.Start(pacListensEndPoint,
                 PacHelper.Create((host) => host == "www.pornhub.com", ProxyMode.CreateHTTP(adErrorEndpoint)),
                 PacHelper.Create((host) => host == "hubt.pornhub.com", ProxyMode.CreateHTTP(adErrorEndpoint)),
@@ -286,7 +287,7 @@ namespace PornhubProxy
 
                 MaxContentSize = 1024 * 1024 * 5,
 
-                ADVideoBytes = File.ReadAllBytes("ad.mp4"),
+                ADVideoBytes = adVido,
 
                 CheckingVideoHtml = Connect.CheckingVideoHtml,
 
