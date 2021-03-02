@@ -225,6 +225,26 @@ namespace PornhubProxy
             };
                
         }
+
+
+
+        public static Func<Stream, string, Task<Stream>> CreateDnsLocalStream()
+        {
+            return (stream, host) => Task.FromResult(stream);
+        }
+
+
+        public static Func<Task<Stream>> CreateDnsRemoteStream(string host, int port)
+        {
+            return async () =>
+            {
+                Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+                await socket.ConnectAsync(host, port).ConfigureAwait(false);
+
+                return new NetworkStream(socket, true);
+            };
+        }
     }
 
     class Program
@@ -305,8 +325,8 @@ namespace PornhubProxy
 
             SniProxyInfo iwaraSniInfo = new SniProxyInfo(
                 iwaraLsitensPoint,
-                Connect.CreateLocalStream(iwaraCert, SslProtocols.Tls12),
-                Connect.CreateRemoteStream("104.20.27.25", 443, IWARA_HOST, (a, b) => (Stream)b, SslProtocols.Tls12));
+                Connect.CreateDnsLocalStream(),
+                Connect.CreateDnsRemoteStream("104.20.27.25", 443));
 
 
             SniProxy iwaraSniProxy = new SniProxy(iwaraSniInfo);
