@@ -28,6 +28,15 @@ namespace LeiKaiFeng.X509Certificates
             extensions.Add(CreateSubAltName(subjectAltNames));
         }
 
+        static byte[] Create20SerialNumber()
+        {
+            byte[] buffer = new byte[20];
+
+            RandomNumberGenerator.Create().GetNonZeroBytes(buffer);
+
+            return buffer;
+        }
+
         public static X509Certificate2 CreateTlsCertificate(string commonName, X509Certificate2 caCertificate, int keySize, int days, params string[] subjectAltNames)
         {
             string subjectName = $"CN = {commonName}";
@@ -42,9 +51,7 @@ namespace LeiKaiFeng.X509Certificates
 
             var dateTime = DateTime.UtcNow;
 
-
-
-            X509Certificate2 tlsCertificate = certificateRequest.Create(caCertificate, new DateTimeOffset(dateTime), new DateTimeOffset(dateTime.AddDays(days)), caCertificate.GetCertHash().Take(20).ToArray());
+            X509Certificate2 tlsCertificate = certificateRequest.Create(caCertificate, new DateTimeOffset(dateTime), new DateTimeOffset(dateTime.AddDays(days)), Create20SerialNumber());
 
             return new X509Certificate2(tlsCertificate.CopyWithPrivateKey(rsa).Export(X509ContentType.Pfx), string.Empty, X509KeyStorageFlags.Exportable);
         }
