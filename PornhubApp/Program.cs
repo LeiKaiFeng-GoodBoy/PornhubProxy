@@ -60,21 +60,24 @@ namespace PornhubProxy
             }
             catch(Exception e)
             {
-                Console.WriteLine(e);
+                
             }
         }
 
         async Task Connect(Stream left_stream)
         {
+            Stream right_stream;
 
             left_stream = await LeiKaiFeng.Proxys.ConnectHelper.ReadConnectRequestAsync(left_stream, m_info.CreateLocalStream).Unwrap().ConfigureAwait(false);
 
-            var right_stream = await m_info.CreateRemoteStream().ConfigureAwait(false);
+            right_stream = await m_info.CreateRemoteStream().ConfigureAwait(false);
+
+
 
             var t1 = left_stream.CopyToAsync(right_stream, 2048);
 
             var t2 = right_stream.CopyToAsync(left_stream);
-            
+
             await Task.WhenAny(t1, t2).ConfigureAwait(false);
 
 
@@ -198,7 +201,14 @@ namespace PornhubProxy
             {
                 SslStream sslStream = new SslStream(stream, false);
 
-                await sslStream.AuthenticateAsServerAsync(certificate, false, System.Security.Authentication.SslProtocols.Tls12, false).ConfigureAwait(false);
+                var info = new SslServerAuthenticationOptions()
+                {
+                    ServerCertificate = certificate,
+
+                    EnabledSslProtocols = System.Security.Authentication.SslProtocols.Tls
+                };
+
+                await sslStream.AuthenticateAsServerAsync(info).ConfigureAwait(false);
 
 
                 return sslStream;
