@@ -293,10 +293,10 @@ namespace PornhubProxy
             
             SetProxy.Set(PacServer.CreatePacUri(pacListensEndPoint));
 
-            X509Certificate2 ca = new X509Certificate2("myCA.pfx");
-            X509Certificate2 mainCert = TLSCertificate.CreateTlsCertificate("pornhub.com", ca, 2048, 2, "pornhub.com", "*.pornhub.com");
-            X509Certificate2 adCert = TLSCertificate.CreateTlsCertificate("adtng.com", ca, 2048, 2, "adtng.com", "*.adtng.com");
-            X509Certificate2 iwaraCert = TLSCertificate.CreateTlsCertificate("iwara.tv", ca, 2048, 2900, "*.iwara.tv");
+            var ca = File.ReadAllBytes("myCA.pfx");
+            X509Certificate2 mainCert = TLSBouncyCastleHelper.GenerateTls(ca, "pornhub.com", 2048, 2, new string[] { "pornhub.com", "*.pornhub.com" });
+            X509Certificate2 adCert = TLSBouncyCastleHelper.GenerateTls(ca, "adtng.com", 2048, 2, new string[] { "adtng.com", "*.adtng.com" });
+            X509Certificate2 iwaraCert = TLSBouncyCastleHelper.GenerateTls(ca, "iwara.tv", 2048, 2, new string[] { "*.iwara.tv" });
 
             PornhubProxyInfo info = new PornhubProxyInfo
             {
