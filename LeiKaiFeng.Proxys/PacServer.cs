@@ -217,9 +217,44 @@ namespace LeiKaiFeng.Pornhub
         }
     }
 
-
+    //PAC文件默认情况下返回空
     public sealed class PacServer
     {
+        
+
+        public sealed class Builder
+        {
+            readonly IPEndPoint m_listenIPEndPoint;
+
+            readonly List<KeyValuePair<Expression<Func<string, bool>>, ProxyMode>> m_list;
+
+            private Builder(IPEndPoint ipEndPoint)
+            {
+                m_listenIPEndPoint = ipEndPoint;
+
+                m_list = new List<KeyValuePair<Expression<Func<string, bool>>, ProxyMode>>();
+            }
+
+            public static Builder Create(IPEndPoint ipEndPoint)
+            {
+                return new Builder(ipEndPoint);
+            }
+
+            public Builder Add(Expression<Func<string, bool>> expression, ProxyMode proxyMode)
+            {
+                m_list.Add(new KeyValuePair<Expression<Func<string, bool>>, ProxyMode>(expression, proxyMode));
+
+                return this;
+            }
+
+
+
+            public PacServer StartPACServer()
+            {
+                return PacServer.Start(m_listenIPEndPoint, m_list.ToArray());
+            }
+        }
+
         const string PAC_CONTENT_TYPE = "application/x-ns-proxy-autoconfig";
 
 
@@ -247,16 +282,8 @@ namespace LeiKaiFeng.Pornhub
         }
 
 
-        public Task Task { get; private set; }
-
-        Socket ListenSocket { get; set; }
-        
-        public void Cancel()
-        {
-            ListenSocket.Close();
-        }
-
-        public static PacServer Start(IPEndPoint server, params KeyValuePair<Expression<Func<string, bool>>, ProxyMode>[] pair)
+       
+        static PacServer Start(IPEndPoint server, KeyValuePair<Expression<Func<string, bool>>, ProxyMode>[] pair)
         {
 
             var buffer = Encoding.UTF8.GetBytes(PacHelper.CreateFunc(pair));
@@ -298,6 +325,16 @@ namespace LeiKaiFeng.Pornhub
             };
         
 
+        }
+
+
+        public Task Task { get; private set; }
+
+        Socket ListenSocket { get; set; }
+
+        public void Cancel()
+        {
+            ListenSocket.Close();
         }
 
     }

@@ -39,6 +39,8 @@ namespace LeiKaiFeng.Pornhub
         public Func<string, bool> CheckingVideoHtml { get; set; }
 
         public Func<Task<MHttpStream>> RemoteStreamCreate { get; set; }
+
+        public IPEndPoint ListenIPEndPoint { get; set; }
     }
 
     public sealed class PornhubProxyServer
@@ -47,28 +49,7 @@ namespace LeiKaiFeng.Pornhub
 
         const string AD_HOST = "adtng.com";
 
-        readonly ChannelWriter<RequestPack> m_getMainHtml;
-
-        readonly PornhubProxyInfo m_info;
-
-        public PornhubProxyServer(PornhubProxyInfo info)
-        {
-            m_info = info;
-
-
-
-            m_getMainHtml = MHttpStreamPack.Create(new MHttpClientHandler
-            {
-                StreamCallback = (uri, handle, token) => m_info.RemoteStreamCreate(),
-
-                MaxStreamPoolCount = 6,
-
-                MaxResponseContentSize = m_info.MaxContentSize
-
-
-            }, new Uri("http://cn.pornhub.com/"));
-        }
-
+        
 
         
 
@@ -243,22 +224,21 @@ namespace LeiKaiFeng.Pornhub
             
             try
             {
-                NetworkStream netWorkStream = new NetworkStream(socket, true);
+                NetworkStream local_stream = new NetworkStream(socket, true);
 
-
-                Uri uri = await ProxyRequestHelper.ReadConnectRequestAsync(netWorkStream, (stream, s) => s).ConfigureAwait(false);
+                Uri uri = await ProxyRequestHelper.ReadConnectRequestAsync(local_stream, (stream, s) => s).ConfigureAwait(false);
 
                 string host = uri.Host;
 
                 if (host.EndsWith(MAIN_HOST))
                 {
-                    Stream stream = await m_info.MainPageStreamCreate(netWorkStream, host).ConfigureAwait(false);
+                    Stream stream = await m_info.MainPageStreamCreate(local_stream, host).ConfigureAwait(false);
 
                     await MainBodyAsync(new MHttpStream(socket, stream)).ConfigureAwait(false);
                 }
                 else if (host.EndsWith(AD_HOST))
                 {
-                    Stream stream = await m_info.ADPageStreamCreate(netWorkStream, host).ConfigureAwait(false);
+                    Stream stream = await m_info.ADPageStreamCreate(local_stream, host).ConfigureAwait(false);
 
                     await AdAsync(new MHttpStream(socket, stream)).ConfigureAwait(false);
                 }
@@ -273,36 +253,79 @@ namespace LeiKaiFeng.Pornhub
             }
         }
 
-        void Add(Socket socket)
-        {
-            Task.Run(() => Conccet(socket));
-        }
-
-
-        public Task Start(IPEndPoint endPoint)
+        public static PornhubProxyServer Start(PornhubProxyInfo info)
         {
             Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 
 
-            socket.Bind(endPoint);
+            socket.Bind(info.ListenIPEndPoint);
 
             socket.Listen(6);
 
+            PornhubProxyServer server = new PornhubProxyServer(info);
 
-            return Task.Run(async () =>
+            Task task = Task.Run(async () =>
             {
-                while (true)
+                try
                 {
-            
-                    var one = await socket.AcceptAsync().ConfigureAwait(false);
+                    while (true)
+                    {
 
-                    Add(one);
+                        var connect = await socket.AcceptAsync().ConfigureAwait(false);
 
+                        Task t = Task.Run(() => server.Conccet(connect));
+                    }
+
+                }
+                catch (ObjectDisposedException)
+                {
 
                 }
 
+               
             });
 
+
+            server.Task = task;
+
+            server.ListenSocket = socket;
+
+
+            return server;
         }
+
+
+
+        readonly ChannelWriter<RequestPack> m_getMainHtml;
+
+        readonly PornhubProxyInfo m_info;
+
+        public Task Task { get; private set; }
+
+        Socket ListenSocket { get; set; }
+
+        public void Cancel()
+        {
+            ListenSocket.Close();
+        }
+
+        private PornhubProxyServer(PornhubProxyInfo info)
+        {
+            m_info = info;
+
+
+
+            m_getMainHtml = MHttpStreamPack.Create(new MHttpClientHandler
+            {
+                StreamCallback = (uri, handle, token) => m_info.RemoteStreamCreate(),
+
+                MaxStreamPoolCount = 6,
+
+                MaxResponseContentSize = m_info.MaxContentSize
+
+
+            }, new Uri("http://cn.pornhub.com/"));
+        }
+
     }
 }

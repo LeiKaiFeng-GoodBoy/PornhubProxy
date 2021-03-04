@@ -20,7 +20,6 @@ using System.Collections.ObjectModel;
 using System.Security.Cryptography;
 using LeiKaiFeng.X509Certificates;
 using System.Security.Authentication;
-
 namespace PornhubProxy
 {
 
@@ -37,22 +36,7 @@ namespace PornhubProxy
 
     public sealed class TunnelProxy
     {
-        private TunnelProxy(Socket listenSocket, Task task)
-        {
-            ListenSocket = listenSocket;
-       
-            Task = task;
-        }
-
-        Socket ListenSocket { get; }
         
-        public Task Task { get; }
-
-      
-        public void Cancel()
-        {
-            ListenSocket.Close();
-        }
 
         static async void CatchAsync(Task task)
         {
@@ -126,6 +110,24 @@ namespace PornhubProxy
 
 
             return new TunnelProxy(socket, task);
+        }
+
+
+        private TunnelProxy(Socket listenSocket, Task task)
+        {
+            ListenSocket = listenSocket;
+
+            Task = task;
+        }
+
+        Socket ListenSocket { get; }
+
+        public Task Task { get; }
+
+
+        public void Cancel()
+        {
+            ListenSocket.Close();
         }
     }
 
@@ -295,13 +297,14 @@ namespace PornhubProxy
             var adVido = File.ReadAllBytes("ad.mp4");
 
 
-            PacServer pacServer = PacServer.Start(pacListensEndPoint,
-                PacHelper.Create((host) => host == "www.pornhub.com", ProxyMode.CreateHTTP(adErrorEndpoint)),
-                PacHelper.Create((host) => host == "hubt.pornhub.com", ProxyMode.CreateHTTP(adErrorEndpoint)),
-                PacHelper.Create((host) => host == "ajax.googleapis.com", ProxyMode.CreateHTTP(adErrorEndpoint)),
-                PacHelper.Create((host) => PacMethod.dnsDomainIs(host, "pornhub.com"), ProxyMode.CreateHTTP(pornhubListensEndPoint)),
-                PacHelper.Create((host) => PacMethod.dnsDomainIs(host, "adtng.com"), ProxyMode.CreateHTTP(pornhubListensEndPoint)),
-                PacHelper.Create((host) => PacMethod.dnsDomainIs(host, IWARA_HOST), ProxyMode.CreateHTTP(iwaraLsitensPoint)));
+            PacServer.Builder.Create(pacListensEndPoint)
+                .Add((host) => host == "www.pornhub.com", ProxyMode.CreateHTTP(adErrorEndpoint))
+                .Add((host) => host == "hubt.pornhub.com", ProxyMode.CreateHTTP(adErrorEndpoint))
+                .Add((host) => host == "ajax.googleapis.com", ProxyMode.CreateHTTP(adErrorEndpoint))
+                .Add((host) => PacMethod.dnsDomainIs(host, "pornhub.com"), ProxyMode.CreateHTTP(pornhubListensEndPoint))
+                .Add((host) => PacMethod.dnsDomainIs(host, "adtng.com"), ProxyMode.CreateHTTP(pornhubListensEndPoint))
+                .Add((host) => PacMethod.dnsDomainIs(host, IWARA_HOST), ProxyMode.CreateHTTP(iwaraLsitensPoint))
+                .StartPACServer();
 
             
             SetProxy.Set(PacServer.CreatePacUri(pacListensEndPoint));
@@ -329,12 +332,11 @@ namespace PornhubProxy
 
                 ReplaceResponseHtml = Connect.ReplaceResponseHtml,
 
+                ListenIPEndPoint = pornhubListensEndPoint
             };
 
-            PornhubProxyServer server = new PornhubProxyServer(info);
 
-
-            Task t1 = server.Start(pornhubListensEndPoint);
+            Task t1 = PornhubProxyServer.Start(info).Task;
 
             TunnelProxyInfo iwaraSniInfo = new TunnelProxyInfo()
             {

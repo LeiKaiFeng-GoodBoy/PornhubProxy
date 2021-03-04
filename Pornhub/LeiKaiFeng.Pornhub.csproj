@@ -7,7 +7,6 @@
 
   <ItemGroup>
     <PackageReference Include="LeiKaiFeng.Http" Version="1.6.2" />
-    <PackageReference Include="LeiKaiFeng.Proxys" Version="1.0.4" />
   </ItemGroup>
 
   <ItemGroup>
