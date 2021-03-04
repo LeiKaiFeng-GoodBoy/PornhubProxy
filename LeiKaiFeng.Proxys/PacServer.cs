@@ -223,7 +223,7 @@ namespace LeiKaiFeng.Pornhub
         const string PAC_CONTENT_TYPE = "application/x-ns-proxy-autoconfig";
 
 
-        static async Task RequestAsync(Socket socket, string s)
+        static async Task RequestAsync(Socket socket, byte[] buffer)
         {
             MHttpStream stream = new MHttpStream(socket, new NetworkStream(socket, true), 1024);
 
@@ -235,37 +235,33 @@ namespace LeiKaiFeng.Pornhub
 
             response.Headers.Set("Content-Type", PAC_CONTENT_TYPE);
 
-            response.SetContent(s);
+            response.SetContent(buffer);
 
 
             await response.SendAsync(stream).ConfigureAwait(false);
         }
-
-        static async Task While(Socket socket, string s)
-        {
-            while (true)
-            {
-
-                Socket client = await socket.AcceptAsync().ConfigureAwait(false);
-
-                Task t = Task.Run(() => RequestAsync(client, s));
-            }
-        }
-
-
-        public Task Task { get; private set; }
-
-        public string Text { get; private set; }
 
         public static Uri CreatePacUri(IPEndPoint endPoint)
         {
             return new Uri($"http://{endPoint.Address}:{endPoint.Port}/proxy.pac");
         }
 
+
+        public Task Task { get; private set; }
+
+        Socket ListenSocket { get; set; }
+        
+        public void Cancel()
+        {
+            ListenSocket.Close();
+        }
+
         public static PacServer Start(IPEndPoint server, params KeyValuePair<Expression<Func<string, bool>>, ProxyMode>[] pair)
         {
 
-            string s = PacHelper.CreateFunc(pair);
+            var buffer = Encoding.UTF8.GetBytes(PacHelper.CreateFunc(pair));
+
+
 
             Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 
@@ -273,14 +269,32 @@ namespace LeiKaiFeng.Pornhub
 
             socket.Listen(6);
 
+            Task task = Task.Run(async () =>
+            {
+                try
+                {
+                    while (true)
+                    {
+
+                        Socket connect = await socket.AcceptAsync().ConfigureAwait(false);
+
+                        Task t = Task.Run(() => RequestAsync(connect, buffer));
+                    }
+                }
+                catch (ObjectDisposedException)
+                {
+
+                }
+            });
+
 
 
             return new PacServer
             {
 
-                Task = Task.Run(() => While(socket, s)),
+                Task = task,
 
-                Text = s
+                ListenSocket = socket
             };
         
 

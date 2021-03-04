@@ -246,8 +246,10 @@ namespace LeiKaiFeng.Pornhub
                 NetworkStream netWorkStream = new NetworkStream(socket, true);
 
 
-                string host = await ConnectHelper.ReadConnectRequestAsync(netWorkStream, (stream, s) => s).ConfigureAwait(false);
-              
+                Uri uri = await ProxyRequestHelper.ReadConnectRequestAsync(netWorkStream, (stream, s) => s).ConfigureAwait(false);
+
+                string host = uri.Host;
+
                 if (host.EndsWith(MAIN_HOST))
                 {
                     Stream stream = await m_info.MainPageStreamCreate(netWorkStream, host).ConfigureAwait(false);

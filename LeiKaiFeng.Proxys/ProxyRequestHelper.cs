@@ -7,12 +7,12 @@ using System.Threading.Tasks;
 
 namespace LeiKaiFeng.Proxys
 {
-    public static class ConnectHelper
+    public static class ProxyRequestHelper
     {
 
 
 
-        public static async Task<T> ReadConnectRequestAsync<T>(Stream stream, Func<Stream, string, T> func)
+        public static async Task<T> ReadConnectRequestAsync<T>(Stream stream, Func<Stream, Uri, T> func)
         {
             MHttpStream httpStream = new MHttpStream(default, stream, 1024);
 
@@ -24,8 +24,8 @@ namespace LeiKaiFeng.Proxys
 
             await response.SendAsync(httpStream).ConfigureAwait(false);
 
-           
-            return func(stream, request.Path.Split(new char[] { ':' }, StringSplitOptions.RemoveEmptyEntries)[0]);
+
+            return func(stream, new Uri($"http://{request.Path}/"));
         }
 
     }

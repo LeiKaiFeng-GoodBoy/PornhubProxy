@@ -8,7 +8,10 @@
   <ItemGroup>
     <PackageReference Include="LeiKaiFeng.Http" Version="1.6.2" />
     <PackageReference Include="LeiKaiFeng.Proxys" Version="1.0.4" />
-    <PackageReference Include="System.Threading.Channels" Version="5.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\LeiKaiFeng.Proxys\LeiKaiFeng.Proxys.csproj" />
   </ItemGroup>
 
 </Project>

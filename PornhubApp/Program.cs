@@ -26,27 +26,35 @@ namespace PornhubProxy
 
     public sealed class TunnelProxyInfo
     {
-        public IPEndPoint IPEndPoint { get; set; }
+        public IPEndPoint ListenIPEndPoint { get; set; }
 
 
-        public Func<Stream, string, Task<Stream>> CreateLocalStream { get; set; }
+        public Func<Stream, Uri, Task<Stream>> CreateLocalStream { get; set; }
 
-        public Func<Task<Stream>> CreateRemoteStream { get; set; }
+        public Func<Uri, Task<Stream>> CreateRemoteStream { get; set; }
 
     }
 
     public sealed class TunnelProxy
     {
-        readonly TunnelProxyInfo m_info;
-
-
-        public TunnelProxy(TunnelProxyInfo info)
+        private TunnelProxy(Socket listenSocket, Task task)
         {
-            m_info = info;
+            ListenSocket = listenSocket;
+       
+            Task = task;
         }
 
+        Socket ListenSocket { get; }
+        
+        public Task Task { get; }
 
-        static async Task CatchAsync(Task task)
+      
+        public void Cancel()
+        {
+            ListenSocket.Close();
+        }
+
+        static async void CatchAsync(Task task)
         {
             try
             {
@@ -54,17 +62,21 @@ namespace PornhubProxy
             }
             catch(Exception e)
             {
-                
+                Console.WriteLine(e);
             }
         }
 
-        async Task Connect(Stream left_stream)
+        static async Task Connect(TunnelProxyInfo info, Stream left_stream)
         {
             Stream right_stream;
 
-            left_stream = await LeiKaiFeng.Proxys.ConnectHelper.ReadConnectRequestAsync(left_stream, m_info.CreateLocalStream).Unwrap().ConfigureAwait(false);
+            Uri uri = await LeiKaiFeng.Proxys.ProxyRequestHelper.
+                ReadConnectRequestAsync(left_stream, (a, b) => b)
+                .ConfigureAwait(false);
 
-            right_stream = await m_info.CreateRemoteStream().ConfigureAwait(false);
+            left_stream = await info.CreateLocalStream(left_stream, uri).ConfigureAwait(false);
+
+            right_stream = await info.CreateRemoteStream(uri).ConfigureAwait(false);
 
 
 
@@ -72,41 +84,49 @@ namespace PornhubProxy
 
             var t2 = right_stream.CopyToAsync(left_stream);
 
-            await Task.WhenAny(t1, t2).ConfigureAwait(false);
-
-
-            left_stream.Close();
-
-            right_stream.Close();
 
             CatchAsync(t1);
 
             CatchAsync(t2);
-        }
 
-        public Task Start()
-        {
-            Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-
-
-            socket.Bind(m_info.IPEndPoint);
-
-            socket.Listen(6);
-
-
-            return Task.Run(async () =>
+            Task t3 = Task.WhenAny(t1, t2).ContinueWith((t) =>
             {
-                while (true)
-                {
-                    var connent = await socket.AcceptAsync().ConfigureAwait(false);
 
-                    Task task = Task.Run(() => Connect(new NetworkStream(connent, true)));
-                }
+                 left_stream.Close();
+
+                 right_stream.Close();
+
             });
         }
 
+        public static TunnelProxy Start(TunnelProxyInfo info)
+        {
+            Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+            socket.Bind(info.ListenIPEndPoint);
+
+            socket.Listen(6);
+
+            Task task = Task.Run(async () =>
+            {
+                try
+                {
+                    while (true)
+                    {
+                        var connent = await socket.AcceptAsync().ConfigureAwait(false);
+
+                        Task task = Task.Run(() => Connect(info, new NetworkStream(connent, true)));
+                    }
+                }
+                catch (ObjectDisposedException)
+                {
+
+                }       
+            });
 
 
+            return new TunnelProxy(socket, task);
+        }
     }
 
 
@@ -221,15 +241,15 @@ namespace PornhubProxy
 
 
 
-        public static Func<Stream, string, Task<Stream>> CreateDnsLocalStream()
+        public static Func<Stream, Uri, Task<Stream>> CreateDnsLocalStream()
         {
             return (stream, host) => Task.FromResult(stream);
         }
 
 
-        public static Func<Task<Stream>> CreateDnsRemoteStream(string host, int port)
+        public static Func<Uri, Task<Stream>> CreateDnsRemoteStream(string host, int port)
         {
-            return async () =>
+            return async (uri) =>
             {
                 Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 
@@ -318,15 +338,12 @@ namespace PornhubProxy
 
             TunnelProxyInfo iwaraSniInfo = new TunnelProxyInfo()
             {
-                IPEndPoint = iwaraLsitensPoint,
+                ListenIPEndPoint = iwaraLsitensPoint,
                 CreateLocalStream = Connect.CreateDnsLocalStream(),
                 CreateRemoteStream = Connect.CreateDnsRemoteStream("104.20.27.25", 443)
             };
 
-
-            TunnelProxy iwaraSniProxy = new TunnelProxy(iwaraSniInfo);
-
-            Task t2 = iwaraSniProxy.Start();
+            Task t2 = TunnelProxy.Start(iwaraSniInfo).Task;
 
             Task.WaitAll(t1, t2);
         }
