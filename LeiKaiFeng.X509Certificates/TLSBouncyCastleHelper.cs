@@ -22,6 +22,41 @@ using SX = System.Security.Cryptography.X509Certificates;
 
 namespace LeiKaiFeng.X509Certificates
 {
+
+    public sealed class CaPack
+    {
+        private CaPack(X509Certificate certificate, AsymmetricKeyParameter privateKey)
+        {
+            Certificate = certificate;
+            PrivateKey = privateKey;
+        }
+
+        public X509Certificate Certificate { get; }
+
+        public AsymmetricKeyParameter PrivateKey { get; }
+
+        static CaPack Create(SX.X509Certificate2 certificate)
+        {
+
+            var cert = DotNetUtilities.FromX509Certificate(certificate);
+
+
+
+
+            var key = DotNetUtilities.GetRsaKeyPair(SX.RSACertificateExtensions.GetRSAPrivateKey(certificate)).Private;
+
+            return new CaPack(cert, key);
+
+        }
+
+
+
+        public static CaPack Create(byte[] rawDate)
+        {
+            return Create(new SX.X509Certificate2(rawDate, string.Empty, SX.X509KeyStorageFlags.Exportable));
+        }
+    }
+
     public static class TLSBouncyCastleHelper
     {
         static readonly SecureRandom Random = new SecureRandom();
@@ -130,24 +165,7 @@ namespace LeiKaiFeng.X509Certificates
 
         }
 
-        static void AsFrom(SX.X509Certificate2 certificate, out X509Certificate one, out AsymmetricKeyParameter tow)
-        {
-
-            one = DotNetUtilities.FromX509Certificate(certificate);
-
-
-
-
-            tow = DotNetUtilities.GetRsaKeyPair(SX.RSACertificateExtensions.GetRSAPrivateKey(certificate)).Private;
-
-        }
-
-
-
-        static void AsFrom(byte[] rawDate, out X509Certificate one, out AsymmetricKeyParameter tow)
-        {
-            AsFrom(new SX.X509Certificate2(rawDate, string.Empty, SX.X509KeyStorageFlags.Exportable), out one, out tow);
-        }
+        
 
         public static SX.X509Certificate2 GenerateCA(
             string name,
@@ -178,62 +196,83 @@ namespace LeiKaiFeng.X509Certificates
 
         }
 
-        public static SX.X509Certificate2 GenerateTls(
-            byte[] caRawDate,
+
+        static X509V3CertificateGenerator GenerateTls(
+            X509Name issuerName,
+            AsymmetricKeyParameter issuerPublicKey,
+            X509Name subjectName,
+            AsymmetricKeyParameter subjectPublicKey,
+            int days,
+            string[] subjectNames
+            )
+        {
+            var certGen = new X509V3CertificateGenerator();
+
+            certGen.SetIssuerDN(issuerName);
+
+            certGen.SetSubjectDN(subjectName);
+
+            certGen.SetSerialNumber(GenerateSerialNumber(Random));
+
+            SetDateTime(certGen, days);
+
+            certGen.SetPublicKey(subjectPublicKey);
+
+            SetBasicConstraints(certGen, false);
+
+            SetExtendedKeyUsage(certGen);
+
+            SetuthorityKeyIdentifier(certGen, issuerPublicKey);
+
+            SetSubjectPublicKey(certGen, subjectPublicKey);
+
+            SetSubjectAlternativeNames(certGen, subjectNames);
+
+
+            return certGen;
+        }
+
+        static SX.X509Certificate2 GenerateTls(
+            CaPack ca,
             string name,
             int keySize,
             int days,
             string[] subjectNames)
         {
-            var subject = new X509Name($"CN={name}");
+            var subjectName = new X509Name($"CN={name}");
 
+            var subjectKey = GenerateRsaKeyPair(Random, keySize);
 
+            var certGen = GenerateTls(
+                ca.Certificate.IssuerDN,
+                ca.Certificate.GetPublicKey(),
+                subjectName,
+                subjectKey.Public,
+                days,
+                subjectNames);
 
-            AsFrom(caRawDate, out var ca_certificate, out var ca_private_key);
-
-
-
-            var key = GenerateRsaKeyPair(Random, keySize);
-
-            var cert = new X509V3CertificateGenerator();
-
-            cert.SetIssuerDN(ca_certificate.SubjectDN);
-            
-            cert.SetSubjectDN(subject);
-            
-            cert.SetSerialNumber(GenerateSerialNumber(Random));
-            
-            SetDateTime(cert, days);
-            
-            cert.SetPublicKey(key.Public);
-
-            SetBasicConstraints(cert, false);
-            
-            SetExtendedKeyUsage(cert);
-
-            SetuthorityKeyIdentifier(cert, ca_certificate.GetPublicKey());
-
-            SetSubjectPublicKey(cert, key.Public);
-
-            SetSubjectAlternativeNames(cert, subjectNames);
-
-
-            var x509 = cert.Generate(new Asn1SignatureFactory(PkcsObjectIdentifiers.Sha256WithRsaEncryption.Id, ca_private_key));
+            var x509 = certGen.Generate(new Asn1SignatureFactory(
+                PkcsObjectIdentifiers.Sha256WithRsaEncryption.Id,
+                ca.PrivateKey));
 
 
 
 
 
-            return AsForm(x509, key, Random);
+            return AsForm(x509, subjectKey, Random);
 
         }
 
 
-        static void Main()
+        public static SX.X509Certificate2 GenerateTls(
+            CaPack ca,
+            string name,
+            int keySize,
+            int days,
+            string subjectName,
+            params string[] subjectNames)
         {
-            var ca = TLSBouncyCastleHelper.GenerateTls(File.ReadAllBytes("myCA.pfx"), "x", 2048, 2, new string[] { "cn.com" });
-
-            File.WriteAllBytes("t.cer", ca.Export(SX.X509ContentType.Cert));
+            return GenerateTls(ca, name, keySize, days, subjectNames.Append(subjectName).ToArray());
         }
     }
 }

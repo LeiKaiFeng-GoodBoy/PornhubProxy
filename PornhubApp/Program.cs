@@ -24,30 +24,23 @@ using System.Security.Authentication;
 namespace PornhubProxy
 {
 
-    public sealed class SniProxyInfo
+    public sealed class TunnelProxyInfo
     {
-        public SniProxyInfo(IPEndPoint iPEndPoint, Func<Stream, string, Task<Stream>> createLocalStream, Func<Task<Stream>> createRemoteStream)
-        {
-            IPEndPoint = iPEndPoint;
-            CreateLocalStream = createLocalStream;
-            CreateRemoteStream = createRemoteStream;
-        }
-
-        public IPEndPoint IPEndPoint { get; }
+        public IPEndPoint IPEndPoint { get; set; }
 
 
-        public Func<Stream, string, Task<Stream>> CreateLocalStream { get; }
+        public Func<Stream, string, Task<Stream>> CreateLocalStream { get; set; }
 
-        public Func<Task<Stream>> CreateRemoteStream { get; }
+        public Func<Task<Stream>> CreateRemoteStream { get; set; }
 
     }
 
-    public sealed class SniProxy
+    public sealed class TunnelProxy
     {
-        SniProxyInfo m_info;
+        readonly TunnelProxyInfo m_info;
 
 
-        public SniProxy(SniProxyInfo info)
+        public TunnelProxy(TunnelProxyInfo info)
         {
             m_info = info;
         }
@@ -293,10 +286,10 @@ namespace PornhubProxy
             
             SetProxy.Set(PacServer.CreatePacUri(pacListensEndPoint));
 
-            var ca = File.ReadAllBytes("myCA.pfx");
-            X509Certificate2 mainCert = TLSBouncyCastleHelper.GenerateTls(ca, "pornhub.com", 2048, 2, new string[] { "pornhub.com", "*.pornhub.com" });
-            X509Certificate2 adCert = TLSBouncyCastleHelper.GenerateTls(ca, "adtng.com", 2048, 2, new string[] { "adtng.com", "*.adtng.com" });
-            X509Certificate2 iwaraCert = TLSBouncyCastleHelper.GenerateTls(ca, "iwara.tv", 2048, 2, new string[] { "*.iwara.tv" });
+            var ca = CaPack.Create(File.ReadAllBytes("myCA.pfx"));
+            X509Certificate2 mainCert = TLSBouncyCastleHelper.GenerateTls(ca, "pornhub.com", 2048, 2, "pornhub.com", "*.pornhub.com");
+            X509Certificate2 adCert = TLSBouncyCastleHelper.GenerateTls(ca, "adtng.com", 2048, 2, "adtng.com", "*.adtng.com");
+            X509Certificate2 iwaraCert = TLSBouncyCastleHelper.GenerateTls(ca, "iwara.tv", 2048, 2, "*.iwara.tv");
 
             PornhubProxyInfo info = new PornhubProxyInfo
             {
@@ -323,13 +316,15 @@ namespace PornhubProxy
 
             Task t1 = server.Start(pornhubListensEndPoint);
 
-            SniProxyInfo iwaraSniInfo = new SniProxyInfo(
-                iwaraLsitensPoint,
-                Connect.CreateDnsLocalStream(),
-                Connect.CreateDnsRemoteStream("104.20.27.25", 443));
+            TunnelProxyInfo iwaraSniInfo = new TunnelProxyInfo()
+            {
+                IPEndPoint = iwaraLsitensPoint,
+                CreateLocalStream = Connect.CreateDnsLocalStream(),
+                CreateRemoteStream = Connect.CreateDnsRemoteStream("104.20.27.25", 443)
+            };
 
 
-            SniProxy iwaraSniProxy = new SniProxy(iwaraSniInfo);
+            TunnelProxy iwaraSniProxy = new TunnelProxy(iwaraSniInfo);
 
             Task t2 = iwaraSniProxy.Start();
 
