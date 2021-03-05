@@ -27,116 +27,6 @@ namespace PornhubProxy
 
  
 
-
-    public sealed class TunnelProxyInfo
-    {
-        public IPEndPoint ListenIPEndPoint { get; set; }
-
-
-        public Func<Stream, Uri, Task<Stream>> CreateLocalStream { get; set; }
-
-        public Func<Uri, Task<Stream>> CreateRemoteStream { get; set; }
-
-    }
-
-    public sealed class TunnelProxy
-    {
-        
-
-        static async void CatchAsync(Task task)
-        {
-            try
-            {
-                await task.ConfigureAwait(false);
-            }
-            catch(Exception e)
-            {
-                Console.WriteLine(e);
-            }
-        }
-
-        static async Task Connect(TunnelProxyInfo info, Stream left_stream)
-        {
-            Stream right_stream;
-
-            Uri uri = await LeiKaiFeng.Proxys.ProxyRequestHelper.
-                ReadConnectRequestAsync(left_stream, (a, b) => b)
-                .ConfigureAwait(false);
-
-            left_stream = await info.CreateLocalStream(left_stream, uri).ConfigureAwait(false);
-
-            right_stream = await info.CreateRemoteStream(uri).ConfigureAwait(false);
-
-
-
-            var t1 = left_stream.CopyToAsync(right_stream, 2048);
-
-            var t2 = right_stream.CopyToAsync(left_stream);
-
-
-            CatchAsync(t1);
-
-            CatchAsync(t2);
-
-            Task t3 = Task.WhenAny(t1, t2).ContinueWith((t) =>
-            {
-
-                 left_stream.Close();
-
-                 right_stream.Close();
-
-            });
-        }
-
-        public static TunnelProxy Start(TunnelProxyInfo info)
-        {
-            Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-
-            socket.Bind(info.ListenIPEndPoint);
-
-            socket.Listen(6);
-
-            Task task = Task.Run(async () =>
-            {
-                try
-                {
-                    while (true)
-                    {
-                        var connent = await socket.AcceptAsync().ConfigureAwait(false);
-
-                        Task task = Task.Run(() => Connect(info, new NetworkStream(connent, true)));
-                    }
-                }
-                catch (ObjectDisposedException)
-                {
-
-                }       
-            });
-
-
-            return new TunnelProxy(socket, task);
-        }
-
-
-        private TunnelProxy(Socket listenSocket, Task task)
-        {
-            ListenSocket = listenSocket;
-
-            Task = task;
-        }
-
-        Socket ListenSocket { get; }
-
-        public Task Task { get; }
-
-
-        public void Cancel()
-        {
-            ListenSocket.Close();
-        }
-    }
-
-
     public static class SetProxy
     {
 
@@ -170,7 +60,7 @@ namespace PornhubProxy
     }
 
 
-    static class Connect
+    static class PornhubHelper
     {
         public static string ReplaceResponseHtml(string html)
         {
@@ -196,94 +86,13 @@ namespace PornhubProxy
         }
 
 
-        public static Func<Task<T>> CreateRemoteStream<T>(string host, int port, string sni, Func<Socket, SslStream, T> func, SslProtocols sslProtocols = SslProtocols.None)
-        {
-            return async () =>
-            {
-                Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-
-                await socket.ConnectAsync(host, port).ConfigureAwait(false);
-
-                SslStream sslStream = new SslStream(new NetworkStream(socket, true), false);
-
-
-                var info = new SslClientAuthenticationOptions()
-                {
-                    RemoteCertificateValidationCallback = (a, b, c, d) => true,
-
-                    EnabledSslProtocols = sslProtocols,
-
-                    TargetHost = sni
-                };
-
-                await sslStream.AuthenticateAsClientAsync(info).ConfigureAwait(false);
-
-                return func(socket, sslStream);
-            };
-           
-
-           
-        }
-
-        public static Func<Stream, string, Task<Stream>> CreateLocalStream(X509Certificate certificate, SslProtocols sslProtocols = SslProtocols.None)
-        {
-            return async (stream, host) =>
-            {
-                SslStream sslStream = new SslStream(stream, false);
-
-                var info = new SslServerAuthenticationOptions()
-                {
-                    ServerCertificate = certificate,
-
-                    EnabledSslProtocols = sslProtocols
-                };
-
-                await sslStream.AuthenticateAsServerAsync(info).ConfigureAwait(false);
-
-
-                return sslStream;
-            };
-               
-        }
-
-
-
-        public static Func<Stream, Uri, Task<Stream>> CreateDnsLocalStream()
-        {
-            return (stream, host) => Task.FromResult(stream);
-        }
-
-
-        public static Func<Uri, Task<Stream>> CreateDnsRemoteStream(string host, int port)
-        {
-            return async (uri) =>
-            {
-                Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-
-                await socket.ConnectAsync(host, port).ConfigureAwait(false);
-
-                return new NetworkStream(socket, true);
-            };
-        }
+        
     }
 
     class Program
     {
         static void Main(string[] args)
         {
-            Task.Run(async () =>
-            {
-
-                while (true)
-                {
-                    await Task.Delay(new TimeSpan(0, 0, 10)).ConfigureAwait(false);
-
-
-                    GC.Collect();
-                }
-
-            });
-
             //AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException;
             //TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
 
@@ -302,6 +111,19 @@ namespace PornhubProxy
             var adVido = File.ReadAllBytes("ad.mp4");
 
 
+            
+
+            
+            
+            var ca = CaPack.Create(File.ReadAllBytes("myCA.pfx"));
+            X509Certificate2 mainCert = TLSBouncyCastleHelper.GenerateTls(ca, "pornhub.com", 2048, 2, "pornhub.com", "*.pornhub.com");
+            X509Certificate2 adCert = TLSBouncyCastleHelper.GenerateTls(ca, "adtng.com", 2048, 2, "adtng.com", "*.adtng.com");
+            X509Certificate2 iwaraCert = TLSBouncyCastleHelper.GenerateTls(ca, "iwara.tv", 2048, 2, "*.iwara.tv");
+
+
+            SetProxy.Set(PacServer.CreatePacUri(pacListensEndPoint));
+
+
             PacServer.Builder.Create(pacListensEndPoint)
                 .Add((host) => host == "www.pornhub.com", ProxyMode.CreateHTTP(adErrorEndpoint))
                 .Add((host) => host == "hubt.pornhub.com", ProxyMode.CreateHTTP(adErrorEndpoint))
@@ -312,31 +134,23 @@ namespace PornhubProxy
                 .Add((host) => PacMethod.dnsDomainIs(host, IWARA_HOST), ProxyMode.CreateHTTP(iwaraLsitensPoint))
                 .StartPACServer();
 
-            
-            SetProxy.Set(PacServer.CreatePacUri(pacListensEndPoint));
-
-            var ca = CaPack.Create(File.ReadAllBytes("myCA.pfx"));
-            X509Certificate2 mainCert = TLSBouncyCastleHelper.GenerateTls(ca, "pornhub.com", 2048, 2, "pornhub.com", "*.pornhub.com");
-            X509Certificate2 adCert = TLSBouncyCastleHelper.GenerateTls(ca, "adtng.com", 2048, 2, "adtng.com", "*.adtng.com");
-            X509Certificate2 iwaraCert = TLSBouncyCastleHelper.GenerateTls(ca, "iwara.tv", 2048, 2, "*.iwara.tv");
-
             PornhubProxyInfo info = new PornhubProxyInfo
             {
-                MainPageStreamCreate = Connect.CreateLocalStream(new X509Certificate2(mainCert), SslProtocols.Tls12),
+                MainPageStreamCreate = ConnectHelper.CreateLocalStream(new X509Certificate2(mainCert), SslProtocols.Tls12),
 
-                ADPageStreamCreate = Connect.CreateLocalStream(new X509Certificate2(adCert), SslProtocols.Tls12),
+                ADPageStreamCreate = ConnectHelper.CreateLocalStream(new X509Certificate2(adCert), SslProtocols.Tls12),
 
-                RemoteStreamCreate = Connect.CreateRemoteStream(PORNHUB_HOST, 443, PORNHUB_HOST, (a, b) => new MHttpStream(a, b), SslProtocols.Tls12),
+                RemoteStreamCreate = ConnectHelper.CreateRemoteStream(PORNHUB_HOST, 443, PORNHUB_HOST, (a, b) => new MHttpStream(a, b), SslProtocols.Tls12),
 
                 MaxContentSize = 1024 * 1024 * 5,
 
                 ADVideoBytes = adVido,
 
-                CheckingVideoHtml = Connect.CheckingVideoHtml,
+                CheckingVideoHtml = PornhubHelper.CheckingVideoHtml,
 
                 MaxRefreshRequestCount = 30,
 
-                ReplaceResponseHtml = Connect.ReplaceResponseHtml,
+                ReplaceResponseHtml = PornhubHelper.ReplaceResponseHtml,
 
                 ListenIPEndPoint = pornhubListensEndPoint
             };
@@ -347,8 +161,14 @@ namespace PornhubProxy
             TunnelProxyInfo iwaraSniInfo = new TunnelProxyInfo()
             {
                 ListenIPEndPoint = iwaraLsitensPoint,
-                CreateLocalStream = Connect.CreateDnsLocalStream(),
-                CreateRemoteStream = Connect.CreateDnsRemoteStream("104.26.12.12", 443)
+                CreateLocalStream = ConnectHelper.CreateDnsLocalStream(),
+                CreateRemoteStream = ConnectHelper.CreateDnsRemoteStream(
+                    443,
+                    "104.26.12.12",
+                    "104.20.201.232",
+                    "104.24.48.227",
+                    "104.22.27.126",
+                    "104.24.53.193")
             };
 
             Task t2 = TunnelProxy.Start(iwaraSniInfo).Task;
