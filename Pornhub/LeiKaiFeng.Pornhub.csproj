@@ -2,15 +2,12 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
-    <Version>1.0.7</Version>
+    <Version>1.0.8</Version>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="LeiKaiFeng.Http" Version="1.6.2" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\LeiKaiFeng.Proxys\LeiKaiFeng.Proxys.csproj" />
+    <PackageReference Include="LeiKaiFeng.Proxys" Version="1.0.5" />
   </ItemGroup>
 
 </Project>
