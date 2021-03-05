@@ -342,7 +342,7 @@ namespace PornhubProxy
             {
                 ListenIPEndPoint = iwaraLsitensPoint,
                 CreateLocalStream = Connect.CreateDnsLocalStream(),
-                CreateRemoteStream = Connect.CreateDnsRemoteStream("104.20.27.25", 443)
+                CreateRemoteStream = Connect.CreateDnsRemoteStream("www.leikaifeng.monster", 443)
             };
 
             Task t2 = TunnelProxy.Start(iwaraSniInfo).Task;
