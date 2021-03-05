@@ -20,8 +20,13 @@ using System.Collections.ObjectModel;
 using System.Security.Cryptography;
 using LeiKaiFeng.X509Certificates;
 using System.Security.Authentication;
+using System.Net.NetworkInformation;
+
 namespace PornhubProxy
 {
+
+ 
+
 
     public sealed class TunnelProxyInfo
     {
@@ -303,6 +308,7 @@ namespace PornhubProxy
                 .Add((host) => host == "ajax.googleapis.com", ProxyMode.CreateHTTP(adErrorEndpoint))
                 .Add((host) => PacMethod.dnsDomainIs(host, "pornhub.com"), ProxyMode.CreateHTTP(pornhubListensEndPoint))
                 .Add((host) => PacMethod.dnsDomainIs(host, "adtng.com"), ProxyMode.CreateHTTP(pornhubListensEndPoint))
+                .Add((host) => host == "i.iwara.tv", ProxyMode.CreateDIRECT())
                 .Add((host) => PacMethod.dnsDomainIs(host, IWARA_HOST), ProxyMode.CreateHTTP(iwaraLsitensPoint))
                 .StartPACServer();
 
@@ -342,7 +348,7 @@ namespace PornhubProxy
             {
                 ListenIPEndPoint = iwaraLsitensPoint,
                 CreateLocalStream = Connect.CreateDnsLocalStream(),
-                CreateRemoteStream = Connect.CreateDnsRemoteStream("www.leikaifeng.monster", 443)
+                CreateRemoteStream = Connect.CreateDnsRemoteStream("104.26.12.12", 443)
             };
 
             Task t2 = TunnelProxy.Start(iwaraSniInfo).Task;
