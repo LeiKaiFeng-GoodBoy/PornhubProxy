@@ -1,0 +1,7 @@
+运行要求 .NETFramework v4.7.2以上
+
+1.(可选)将文件夹中的myCA.crt导入到系统受信任的根证书列表,是受信任的根证书列表,是受信任的根证书列表,这一步是避免浏览器隐私警告,只有Chrome有效,Firefox不管用,所以不导入也可以用,只不过需要忽略浏览器警告
+
+2.运行文件夹中的PornhubProxy.exe
+
+3.在浏览器中访问链接(注意是HTTPS) https://cn.pornhub.com/

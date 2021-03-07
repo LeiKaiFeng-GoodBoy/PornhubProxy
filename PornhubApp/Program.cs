@@ -96,6 +96,10 @@ namespace PornhubProxy
             AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException;
             //TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
 
+            string basePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets");
+
+            byte[] vidoBuffer = File.ReadAllBytes(Path.Combine(basePath, "ad.mp4"));
+            byte[] caCert = File.ReadAllBytes(Path.Combine(basePath, "myCA.pfx"));
 
             const string PORNHUB_HOST = "www.livehub.com";
             
@@ -108,14 +112,14 @@ namespace PornhubProxy
             var pacListensEndPoint = new IPEndPoint(ip, 8080);
             var adErrorEndpoint = new IPEndPoint(IPAddress.Loopback, 80);
             var iwaraLsitensPoint = new IPEndPoint(ip, 6456);
-            var adVido = File.ReadAllBytes("ad.mp4");
+            var adVido = vidoBuffer;
 
 
-            
 
-            
-            
-            var ca = CaPack.Create(File.ReadAllBytes("myCA.pfx"));
+
+
+
+            var ca = CaPack.Create(caCert);
             X509Certificate2 mainCert = TLSBouncyCastleHelper.GenerateTls(ca, "pornhub.com", 2048, 2, "pornhub.com", "*.pornhub.com");
             X509Certificate2 adCert = TLSBouncyCastleHelper.GenerateTls(ca, "adtng.com", 2048, 2, "adtng.com", "*.adtng.com");
             X509Certificate2 iwaraCert = TLSBouncyCastleHelper.GenerateTls(ca, "iwara.tv", 2048, 2, "*.iwara.tv");

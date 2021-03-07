@@ -14,4 +14,16 @@
     <ProjectReference Include="..\Pornhub\LeiKaiFeng.Pornhub.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Assets\ad.mp4">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\myCA.pfx">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\使用方法.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
