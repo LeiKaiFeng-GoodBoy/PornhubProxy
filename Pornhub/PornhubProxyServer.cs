@@ -30,9 +30,9 @@ namespace LeiKaiFeng.Pornhub
     {
         public byte[] ADVideoBytes { get; set; }
 
-        public Func<NetworkStream, string, Task<Stream>> ADPageStreamCreate { get; set; }
+        public Func<NetworkStream, Uri, Task<Stream>> ADPageStreamCreate { get; set; }
 
-        public Func<NetworkStream, string, Task<Stream>> MainPageStreamCreate { get; set; }
+        public Func<NetworkStream, Uri, Task<Stream>> MainPageStreamCreate { get; set; }
 
         public int MaxContentSize { get; set; }
 
@@ -42,7 +42,7 @@ namespace LeiKaiFeng.Pornhub
 
         public Func<string, bool> CheckingVideoHtml { get; set; }
 
-        public Func<Task<MHttpStream>> RemoteStreamCreate { get; set; }
+        public Func<Uri, Task<MHttpStream>> RemoteStreamCreate { get; set; }
 
         public IPEndPoint ListenIPEndPoint { get; set; }
     }
@@ -104,10 +104,10 @@ namespace LeiKaiFeng.Pornhub
                 {
                     
                 }
-                catch (MHttpNotImplementedException)
-                {
-                    //这个地方主要是因为服务器返回的408响应没有长度,通过断开连接指示长度,相关的逻辑没有写
-                }
+                //catch (MHttpNotImplementedException)
+                //{
+                //    //这个地方主要是因为服务器返回的408响应没有长度,通过断开连接指示长度,相关的逻辑没有写
+                //}
             }
         }
 
@@ -228,6 +228,7 @@ namespace LeiKaiFeng.Pornhub
             
             try
             {
+               
                 NetworkStream local_stream = new NetworkStream(socket, true);
 
                 Uri uri = await ProxyRequestHelper.ReadConnectRequestAsync(local_stream, (stream, s) => s).ConfigureAwait(false);
@@ -236,13 +237,13 @@ namespace LeiKaiFeng.Pornhub
 
                 if (host.EndsWith(MAIN_HOST))
                 {
-                    Stream stream = await m_info.MainPageStreamCreate(local_stream, host).ConfigureAwait(false);
-
+                    Stream stream = await m_info.MainPageStreamCreate(local_stream, uri).ConfigureAwait(false);
+                   
                     await MainBodyAsync(new MHttpStream(socket, stream)).ConfigureAwait(false);
                 }
                 else if (host.EndsWith(AD_HOST))
                 {
-                    Stream stream = await m_info.ADPageStreamCreate(local_stream, host).ConfigureAwait(false);
+                    Stream stream = await m_info.ADPageStreamCreate(local_stream, uri).ConfigureAwait(false);
 
                     await AdAsync(new MHttpStream(socket, stream)).ConfigureAwait(false);
                 }
@@ -267,7 +268,7 @@ namespace LeiKaiFeng.Pornhub
             socket.Listen(6);
 
             PornhubProxyServer server = new PornhubProxyServer(info);
-
+           
             Task task = Task.Run(async () =>
             {
                 try
@@ -321,7 +322,7 @@ namespace LeiKaiFeng.Pornhub
 
             m_getMainHtml = MHttpStreamPack.Create(new MHttpClientHandler
             {
-                StreamCallback = (uri, handle, token) => m_info.RemoteStreamCreate(),
+                StreamCallback = (uri, handle, token) => m_info.RemoteStreamCreate(uri),
 
                 MaxStreamPoolCount = 6,
 

@@ -15,9 +15,9 @@ namespace LeiKaiFeng.Pornhub
 {
     public static class ConnectHelper
     {
-        public static Func<Task<T>> CreateRemoteStream<T>(string host, int port, string sni, Func<Socket, SslStream, T> func, SslProtocols sslProtocols = SslProtocols.None)
+        public static Func<Uri, Task<T>> CreateRemoteStream<T>(string host, int port, string sni, Func<Socket, SslStream, T> func, SslProtocols sslProtocols = SslProtocols.None)
         {
-            return async () =>
+            return async (uri) =>
             {
                 Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 
@@ -44,7 +44,7 @@ namespace LeiKaiFeng.Pornhub
 
         }
 
-        public static Func<Stream, string, Task<Stream>> CreateLocalStream(X509Certificate certificate, SslProtocols sslProtocols = SslProtocols.None)
+        public static Func<Stream, Uri, Task<Stream>> CreateLocalStream(X509Certificate certificate, SslProtocols sslProtocols = SslProtocols.None)
         {
             return async (stream, host) =>
             {
