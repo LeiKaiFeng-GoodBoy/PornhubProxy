@@ -93,7 +93,7 @@ namespace PornhubProxy
     {
         static void Main(string[] args)
         {
-            AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException;
+            //AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException;
             //TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
 
             string basePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets");
