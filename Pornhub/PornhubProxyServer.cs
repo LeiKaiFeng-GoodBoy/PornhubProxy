@@ -10,7 +10,6 @@ using System.Linq;
 using System.Threading;
 using System.Net;
 using System.Threading.Channels;
-using LeiKaiFeng.Proxys;
 
 namespace LeiKaiFeng.Pornhub
 {

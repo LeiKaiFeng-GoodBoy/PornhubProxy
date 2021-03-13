@@ -9,7 +9,7 @@ using LeiKaiFeng.Http;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 
-namespace LeiKaiFeng.Proxys
+namespace LeiKaiFeng.Pornhub
 {
     public abstract class ProxyMode
     {

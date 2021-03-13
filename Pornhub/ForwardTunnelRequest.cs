@@ -8,9 +8,9 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using TunnelPackAction = System.Action<System.Uri, LeiKaiFeng.Proxys.TunnelPack>;
+using TunnelPackAction = System.Action<System.Uri, LeiKaiFeng.Pornhub.TunnelPack>;
 
-namespace LeiKaiFeng.Proxys
+namespace LeiKaiFeng.Pornhub
 {
     
     public sealed class TunnelPack

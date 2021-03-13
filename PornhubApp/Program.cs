@@ -1,32 +1,55 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using LeiKaiFeng.Http;
+using LeiKaiFeng.Pornhub;
+using LeiKaiFeng.X509Certificates;
+using Microsoft.Win32;
+using System;
 using System.IO;
 using System.Linq;
 using System.Net;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Net.Security;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
+using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading;
+using System.Text.Json;
 using System.Threading.Tasks;
-using LeiKaiFeng.Http;
-using LeiKaiFeng.Pornhub;
-using System.Runtime.InteropServices;
-using Microsoft.Win32;
-using System.Collections.ObjectModel;
-using System.Security.Cryptography;
-using LeiKaiFeng.X509Certificates;
-using System.Security.Authentication;
-using System.Net.NetworkInformation;
-using LeiKaiFeng.Proxys;
 
 namespace PornhubProxy
 {
 
- 
+    public sealed class Info
+    {
+        public Info()
+        {
+            PacServerListen = new IPEndPoint(IPAddress.Any, 1080).ToString();
+
+            ProxyServerListen = new IPEndPoint(IPAddress.Any, 8080).ToString();
+
+            InvalidIPEndPoint = "127.0.0.5:80";
+
+            var ip =
+                Dns.GetHostAddresses(Dns.GetHostName())
+                .Where((item) => item.AddressFamily == AddressFamily.InterNetwork)
+                .Where((item) => item != IPAddress.Loopback)
+                .FirstOrDefault() ?? IPAddress.Loopback;
+
+
+            PacProxyIPEndPoint = new IPEndPoint(ip, IPEndPoint.Parse(ProxyServerListen).Port).ToString();
+
+
+        }
+
+
+
+        public string PacServerListen { get; set; }
+
+
+        public string ProxyServerListen { get; set; }
+
+        public string PacProxyIPEndPoint { get; set; }
+
+        public string InvalidIPEndPoint { get; set; }
+    }
 
     public static class SetProxy
     {
@@ -92,16 +115,40 @@ namespace PornhubProxy
 
     class Program
     {
+
+
+        static void SetAutoPac(IPEndPoint endPoint)
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                
+                if (endPoint.Address.ToString() == IPAddress.Any.ToString())
+                {
+                    endPoint = new IPEndPoint(IPAddress.Loopback, endPoint.Port);
+                }
+
+                SetProxy.Set(PacServer.CreatePacUri(endPoint));
+
+
+            }
+
+        }
+
         static void Main(string[] args)
         {
             //AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException;
             //TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
             //RuntimeInformation.IsOSPlatform
 
+
+
+
             string basePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets");
 
             byte[] vidoBuffer = File.ReadAllBytes(Path.Combine(basePath, "ad.mp4"));
             byte[] caCert = File.ReadAllBytes(Path.Combine(basePath, "myCA.pfx"));
+            Info info = JsonSerializer.Deserialize<Info>(File.ReadAllText(Path.Combine(basePath, "info.json"), Encoding.UTF8), new JsonSerializerOptions { ReadCommentHandling = JsonCommentHandling.Skip });
+
 
             const string PORNHUB_DNS_HOST = "www.livehub.com";
             
@@ -114,39 +161,38 @@ namespace PornhubProxy
             const string AD_HOST = "adtng.com";
 
 
-
-            var ip = Dns.GetHostAddresses(Dns.GetHostName()).Where((item) => item.AddressFamily == AddressFamily.InterNetwork).FirstOrDefault() ?? IPAddress.Loopback;
-            
-            
-            var pacListensEndPoint = new IPEndPoint(ip, 1080);
-            var listenEndPoint = new IPEndPoint(ip, 8080);
-            var adErrorEndpoint = new IPEndPoint(IPAddress.Loopback, 80);
+            var pacListensEndPoint = IPEndPoint.Parse(info.PacServerListen);
+            var listenEndPoint = IPEndPoint.Parse(info.ProxyServerListen);
+            var invalidEndpoint = IPEndPoint.Parse(info.InvalidIPEndPoint);
+            var pacWriteEndPoint = IPEndPoint.Parse(info.PacProxyIPEndPoint);
             var adVido = vidoBuffer;
 
 
 
 
+            var ca = new X509Certificate2(caCert);
+            var mainCert = TLSCertificate.CreateTlsCertificate(ca, PORNHUB_HOST, 2048, 2, PORNHUB_HOST, "*." + PORNHUB_HOST);
+            var adCert = TLSCertificate.CreateTlsCertificate(ca, AD_HOST, 2048, 2, AD_HOST, "*." + AD_HOST);
+            var hentaiCert = TLSCertificate.CreateTlsCertificate(ca, HENTAI_HOST, 2048, 2, HENTAI_HOST, "*." + HENTAI_HOST);
 
 
-            var ca = CaPack.Create(caCert);
-            var mainCert = TLSBouncyCastleHelper.GenerateTls(ca, PORNHUB_HOST, 2048, 2, PORNHUB_HOST, "*." + PORNHUB_HOST);
-            var adCert = TLSBouncyCastleHelper.GenerateTls(ca, AD_HOST, 2048, 2, AD_HOST, "*." + AD_HOST);
-            var hentaiCert = TLSBouncyCastleHelper.GenerateTls(ca, HENTAI_HOST, 2048, 2, HENTAI_HOST, "*." + HENTAI_HOST);
 
-            SetProxy.Set(PacServer.CreatePacUri(pacListensEndPoint));
 
             PacServer.Builder.Create(pacListensEndPoint)
-                .Add((host) => host == "www.pornhub.com", ProxyMode.CreateHTTP(adErrorEndpoint))
-                .Add((host) => host == "hubt.pornhub.com", ProxyMode.CreateHTTP(adErrorEndpoint))
-                .Add((host) => host == "ajax.googleapis.com", ProxyMode.CreateHTTP(adErrorEndpoint))
-                .Add((host) => PacMethod.dnsDomainIs(host, PORNHUB_HOST), ProxyMode.CreateHTTP(listenEndPoint))
-                .Add((host) => PacMethod.dnsDomainIs(host, AD_HOST), ProxyMode.CreateHTTP(listenEndPoint))
+                .Add((host) => host == "www.pornhub.com", ProxyMode.CreateHTTP(invalidEndpoint))
+                .Add((host) => host == "hubt.pornhub.com", ProxyMode.CreateHTTP(invalidEndpoint))
+                .Add((host) => host == "ajax.googleapis.com", ProxyMode.CreateHTTP(invalidEndpoint))
+                .Add((host) => PacMethod.dnsDomainIs(host, PORNHUB_HOST), ProxyMode.CreateHTTP(pacWriteEndPoint))
+                .Add((host) => PacMethod.dnsDomainIs(host, AD_HOST), ProxyMode.CreateHTTP(pacWriteEndPoint))
                 .Add((host) => host == "i.iwara.tv", ProxyMode.CreateDIRECT())
-                .Add((host) => PacMethod.dnsDomainIs(host, IWARA_HOST), ProxyMode.CreateHTTP(listenEndPoint))
-                .Add((host)=> PacMethod.dnsDomainIs(host, HENTAI_HOST), ProxyMode.CreateHTTP(listenEndPoint))
+                .Add((host) => PacMethod.dnsDomainIs(host, IWARA_HOST), ProxyMode.CreateHTTP(pacWriteEndPoint))
+                .Add((host)=> PacMethod.dnsDomainIs(host, HENTAI_HOST), ProxyMode.CreateHTTP(pacWriteEndPoint))
                 .StartPACServer();
 
-            PornhubProxyInfo info = new PornhubProxyInfo
+
+            SetAutoPac(pacListensEndPoint);
+
+            PornhubProxyInfo pornhubInfo = new PornhubProxyInfo
             {
                 MainPageStreamCreate = ConnectHelper.CreateLocalStream(new X509Certificate2(mainCert), SslProtocols.Tls12),
 
@@ -166,7 +212,7 @@ namespace PornhubProxy
             };
 
 
-            var pornhubAction = PornhubProxyServer.Start(info);
+            var pornhubAction = PornhubProxyServer.Start(pornhubInfo);
 
 
             TunnelProxyInfo iwaraSniInfo = new TunnelProxyInfo()

@@ -9,8 +9,4 @@
     <PackageReference Include="LeiKaiFeng.Http" Version="1.6.2" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\LeiKaiFeng.Proxys\LeiKaiFeng.Proxys.csproj" />
-  </ItemGroup>
-
 </Project>

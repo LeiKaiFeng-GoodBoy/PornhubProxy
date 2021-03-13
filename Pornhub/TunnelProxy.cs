@@ -1,11 +1,10 @@
-﻿using LeiKaiFeng.Proxys;
-using System;
+﻿using System;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 
-namespace LeiKaiFeng.Proxys
+namespace LeiKaiFeng.Pornhub
 {
 
     public sealed class TunnelProxyInfo

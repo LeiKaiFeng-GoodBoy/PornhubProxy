@@ -10,13 +10,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\LeiKaiFeng.Proxys\LeiKaiFeng.Proxys.csproj" />
-    <ProjectReference Include="..\LeiKaiFeng.X509Certificates\LeiKaiFeng.X509Certificates.csproj" />
     <ProjectReference Include="..\Pornhub\LeiKaiFeng.Pornhub.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <None Update="Assets\ad.mp4">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\info.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="Assets\myCA.pfx">
