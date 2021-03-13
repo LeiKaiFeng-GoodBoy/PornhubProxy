@@ -30,9 +30,9 @@ namespace LeiKaiFeng.Pornhub
     {
         public byte[] ADVideoBytes { get; set; }
 
-        public Func<NetworkStream, Uri, Task<Stream>> ADPageStreamCreate { get; set; }
+        public Func<Stream, Uri, Task<Stream>> ADPageStreamCreate { get; set; }
 
-        public Func<NetworkStream, Uri, Task<Stream>> MainPageStreamCreate { get; set; }
+        public Func<Stream, Uri, Task<Stream>> MainPageStreamCreate { get; set; }
 
         public int MaxContentSize { get; set; }
 
@@ -43,8 +43,6 @@ namespace LeiKaiFeng.Pornhub
         public Func<string, bool> CheckingVideoHtml { get; set; }
 
         public Func<Uri, Task<MHttpStream>> RemoteStreamCreate { get; set; }
-
-        public IPEndPoint ListenIPEndPoint { get; set; }
     }
 
     public sealed class PornhubProxyServer
@@ -220,83 +218,55 @@ namespace LeiKaiFeng.Pornhub
         }
 
 
-
-
-        async Task Conccet(Socket socket)
+        Action<Uri, TunnelPack> Connect()
         {
+            var func = Conccet_Core();
 
-            
-            try
-            {
-               
-                NetworkStream local_stream = new NetworkStream(socket, true);
-
-                Uri uri = await ProxyRequestHelper.ReadConnectRequestAsync(local_stream, (stream, s) => s).ConfigureAwait(false);
-
-                string host = uri.Host;
-
-                if (host.EndsWith(MAIN_HOST))
-                {
-                    Stream stream = await m_info.MainPageStreamCreate(local_stream, uri).ConfigureAwait(false);
-                   
-                    await MainBodyAsync(new MHttpStream(socket, stream)).ConfigureAwait(false);
-                }
-                else if (host.EndsWith(AD_HOST))
-                {
-                    Stream stream = await m_info.ADPageStreamCreate(local_stream, uri).ConfigureAwait(false);
-
-                    await AdAsync(new MHttpStream(socket, stream)).ConfigureAwait(false);
-                }
-                else
-                {
-
-                }
-
-            }
-            catch
-            {
-            }
+            return (uri, tunnelPack) => func(uri, tunnelPack);
         }
 
-        public static PornhubProxyServer Start(PornhubProxyInfo info)
+
+        Func<Uri, TunnelPack, Task> Conccet_Core()
         {
-            Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-
-
-            socket.Bind(info.ListenIPEndPoint);
-
-            socket.Listen(6);
-
-            PornhubProxyServer server = new PornhubProxyServer(info);
-           
-            Task task = Task.Run(async () =>
+            return async (uri, tunnelPack) =>
             {
                 try
                 {
-                    while (true)
+                    
+                   
+                    string host = uri.Host;
+
+                    if (host.EndsWith(MAIN_HOST))
+                    {
+                        Stream stream = await m_info.MainPageStreamCreate(tunnelPack.ConnectStream, uri).ConfigureAwait(false);
+
+                        await MainBodyAsync(new MHttpStream(tunnelPack.ConnectSocket, stream)).ConfigureAwait(false);
+                    }
+                    else if (host.EndsWith(AD_HOST))
+                    {
+                        Stream stream = await m_info.ADPageStreamCreate(tunnelPack.ConnectStream, uri).ConfigureAwait(false);
+
+                        await AdAsync(new MHttpStream(tunnelPack.ConnectSocket, stream)).ConfigureAwait(false);
+                    }
+                    else
                     {
 
-                        var connect = await socket.AcceptAsync().ConfigureAwait(false);
-
-                        Task t = Task.Run(() => server.Conccet(connect));
                     }
 
                 }
-                catch (ObjectDisposedException)
+                catch
                 {
-
                 }
+            };
+                    
+        }
 
-               
-            });
+        public static Action<Uri, TunnelPack> Start(PornhubProxyInfo info)
+        {
+            
+            PornhubProxyServer server = new PornhubProxyServer(info);
 
-
-            server.Task = task;
-
-            server.ListenSocket = socket;
-
-
-            return server;
+            return server.Connect();
         }
 
 
@@ -305,14 +275,6 @@ namespace LeiKaiFeng.Pornhub
 
         readonly PornhubProxyInfo m_info;
 
-        public Task Task { get; private set; }
-
-        Socket ListenSocket { get; set; }
-
-        public void Cancel()
-        {
-            ListenSocket.Close();
-        }
 
         private PornhubProxyServer(PornhubProxyInfo info)
         {

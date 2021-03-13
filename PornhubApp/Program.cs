@@ -21,6 +21,7 @@ using System.Security.Cryptography;
 using LeiKaiFeng.X509Certificates;
 using System.Security.Authentication;
 using System.Net.NetworkInformation;
+using LeiKaiFeng.Proxys;
 
 namespace PornhubProxy
 {
@@ -95,26 +96,31 @@ namespace PornhubProxy
         {
             //AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException;
             //TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
+            //RuntimeInformation.IsOSPlatform
 
             string basePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets");
 
             byte[] vidoBuffer = File.ReadAllBytes(Path.Combine(basePath, "ad.mp4"));
             byte[] caCert = File.ReadAllBytes(Path.Combine(basePath, "myCA.pfx"));
 
-            const string PORNHUB_HOST = "www.livehub.com";
+            const string PORNHUB_DNS_HOST = "www.livehub.com";
+            
+            const string PORNHUB_HOST = "pornhub.com";
             
             const string IWARA_HOST = "iwara.tv";
 
             const string HENTAI_HOST = "e-hentai.org";
 
-            
+            const string AD_HOST = "adtng.com";
+
+
+
             var ip = Dns.GetHostAddresses(Dns.GetHostName()).Where((item) => item.AddressFamily == AddressFamily.InterNetwork).FirstOrDefault() ?? IPAddress.Loopback;
             
-            var pornhubListensEndPoint = new IPEndPoint(ip, 1080);
-            var pacListensEndPoint = new IPEndPoint(ip, 8080);
+            
+            var pacListensEndPoint = new IPEndPoint(ip, 1080);
+            var listenEndPoint = new IPEndPoint(ip, 8080);
             var adErrorEndpoint = new IPEndPoint(IPAddress.Loopback, 80);
-            var iwaraLsitensPoint = new IPEndPoint(ip, 6456);
-            var hentaiListenEndPoint = new IPEndPoint(ip, 34254);
             var adVido = vidoBuffer;
 
 
@@ -123,23 +129,21 @@ namespace PornhubProxy
 
 
             var ca = CaPack.Create(caCert);
-            var mainCert = TLSBouncyCastleHelper.GenerateTls(ca, "pornhub.com", 2048, 2, "pornhub.com", "*.pornhub.com");
-            var adCert = TLSBouncyCastleHelper.GenerateTls(ca, "adtng.com", 2048, 2, "adtng.com", "*.adtng.com");
-            var iwaraCert = TLSBouncyCastleHelper.GenerateTls(ca, "iwara.tv", 2048, 2, "*.iwara.tv");
-            var hentaiCert = TLSBouncyCastleHelper.GenerateTls(ca, HENTAI_HOST, 2048, 2, "*." + HENTAI_HOST, HENTAI_HOST);
+            var mainCert = TLSBouncyCastleHelper.GenerateTls(ca, PORNHUB_HOST, 2048, 2, PORNHUB_HOST, "*." + PORNHUB_HOST);
+            var adCert = TLSBouncyCastleHelper.GenerateTls(ca, AD_HOST, 2048, 2, AD_HOST, "*." + AD_HOST);
+            var hentaiCert = TLSBouncyCastleHelper.GenerateTls(ca, HENTAI_HOST, 2048, 2, HENTAI_HOST, "*." + HENTAI_HOST);
 
             SetProxy.Set(PacServer.CreatePacUri(pacListensEndPoint));
-
 
             PacServer.Builder.Create(pacListensEndPoint)
                 .Add((host) => host == "www.pornhub.com", ProxyMode.CreateHTTP(adErrorEndpoint))
                 .Add((host) => host == "hubt.pornhub.com", ProxyMode.CreateHTTP(adErrorEndpoint))
                 .Add((host) => host == "ajax.googleapis.com", ProxyMode.CreateHTTP(adErrorEndpoint))
-                .Add((host) => PacMethod.dnsDomainIs(host, "pornhub.com"), ProxyMode.CreateHTTP(pornhubListensEndPoint))
-                .Add((host) => PacMethod.dnsDomainIs(host, "adtng.com"), ProxyMode.CreateHTTP(pornhubListensEndPoint))
+                .Add((host) => PacMethod.dnsDomainIs(host, PORNHUB_HOST), ProxyMode.CreateHTTP(listenEndPoint))
+                .Add((host) => PacMethod.dnsDomainIs(host, AD_HOST), ProxyMode.CreateHTTP(listenEndPoint))
                 .Add((host) => host == "i.iwara.tv", ProxyMode.CreateDIRECT())
-                .Add((host) => PacMethod.dnsDomainIs(host, IWARA_HOST), ProxyMode.CreateHTTP(iwaraLsitensPoint))
-                .Add((host)=> PacMethod.dnsDomainIs(host, HENTAI_HOST), ProxyMode.CreateHTTP(hentaiListenEndPoint))
+                .Add((host) => PacMethod.dnsDomainIs(host, IWARA_HOST), ProxyMode.CreateHTTP(listenEndPoint))
+                .Add((host)=> PacMethod.dnsDomainIs(host, HENTAI_HOST), ProxyMode.CreateHTTP(listenEndPoint))
                 .StartPACServer();
 
             PornhubProxyInfo info = new PornhubProxyInfo
@@ -148,7 +152,7 @@ namespace PornhubProxy
 
                 ADPageStreamCreate = ConnectHelper.CreateLocalStream(new X509Certificate2(adCert), SslProtocols.Tls12),
 
-                RemoteStreamCreate = ConnectHelper.CreateRemoteStream(PORNHUB_HOST, 443, PORNHUB_HOST, (a, b) => new MHttpStream(a, b), SslProtocols.Tls12),
+                RemoteStreamCreate = ConnectHelper.CreateRemoteStream(PORNHUB_DNS_HOST, 443, PORNHUB_DNS_HOST, (a, b) => new MHttpStream(a, b), SslProtocols.Tls12),
 
                 MaxContentSize = 1024 * 1024 * 5,
 
@@ -158,17 +162,15 @@ namespace PornhubProxy
 
                 MaxRefreshRequestCount = 30,
 
-                ReplaceResponseHtml = PornhubHelper.ReplaceResponseHtml,
-
-                ListenIPEndPoint = pornhubListensEndPoint
+                ReplaceResponseHtml = PornhubHelper.ReplaceResponseHtml
             };
 
 
-            Task t1 = PornhubProxyServer.Start(info).Task;
+            var pornhubAction = PornhubProxyServer.Start(info);
+
 
             TunnelProxyInfo iwaraSniInfo = new TunnelProxyInfo()
             {
-                ListenIPEndPoint = iwaraLsitensPoint,
                 CreateLocalStream = ConnectHelper.CreateDnsLocalStream(),
                 CreateRemoteStream = ConnectHelper.CreateDnsRemoteStream(
                     443,
@@ -179,24 +181,29 @@ namespace PornhubProxy
                     "104.24.53.193")
             };
 
-            Task t2 = TunnelProxy.Start(iwaraSniInfo).Task;
+            var iwaraAction = TunnelProxy.Create(iwaraSniInfo);
 
 
 
             TunnelProxyInfo hentaiInfo = new TunnelProxyInfo()
-            {
-                ListenIPEndPoint = hentaiListenEndPoint,
-
+            { 
                 CreateLocalStream = ConnectHelper.CreateLocalStream(hentaiCert, SslProtocols.Tls12),
 
-                CreateRemoteStream = ConnectHelper.CreateRemoteStream("104.20.135.21", 443, "104.20.135.21", (s, ssl)=> (Stream)ssl, SslProtocols.Tls12)
+                CreateRemoteStream = ConnectHelper.CreateRemoteStream("104.20.135.21", 443, "104.20.135.21", (s, ssl) => (Stream)ssl, SslProtocols.Tls12)
 
             };
 
-            TunnelProxy.Start(hentaiInfo);
+            var ehentaiAction = TunnelProxy.Create(hentaiInfo);
 
-       
-            Task.WaitAll(t1, t2);
+
+            var forw = ForwardTunnelRequest.Builder.Create()
+                .Add(IWARA_HOST, iwaraAction)
+                .Add(PORNHUB_HOST, pornhubAction)
+                .Add(AD_HOST, pornhubAction)
+                .Add(HENTAI_HOST, ehentaiAction)
+                .Get(listenEndPoint);
+
+            forw.ListenTask.Wait();
         }
 
         private static void TaskScheduler_UnobservedTaskException(object sender, UnobservedTaskExceptionEventArgs e)
