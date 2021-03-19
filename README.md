@@ -10,21 +10,21 @@
 
 解压
 
-1.运行win-x64文件夹中的PornhubApp.exe
+1. 运行win-x64文件夹中的PornhubApp.exe
 
-2.浏览器访问https://cn.pornhub.com/ (会告诉你隐私错误,继续访问就好,不影响)
+2. 浏览器访问https://cn.pornhub.com/ (会告诉你隐私错误,继续访问就好,不影响)
 
 ### linux使用方法（比较麻烦）
 
 解压
 
-1.解压出的文件夹中的Assets子文件夹有一个info.json文件，配置一下
+1. 解压出的文件夹中的Assets子文件夹有一个info.json文件，配置一下
 
-2.运行linux-x64文件夹中的PornhubApp
+2. 运行linux-x64文件夹中的PornhubApp
 
-3.必须手动设置自动代理脚本地址http://ip:port/proxy.pac ip:port根据info.json的值填写
+3. 必须手动设置自动代理脚本地址http://ip:port/proxy.pac ip:port根据info.json的值填写
 
-5.浏览器访问https://cn.pornhub.com/ (会告诉你隐私错误,继续访问就好,不影响)
+5. 浏览器访问https://cn.pornhub.com/ (会告诉你隐私错误,继续访问就好,不影响)
 
 我对前端不了解,去不掉视频播放时的广告,但是广告加载又很慢,所以我搞了一个替代视频在安装包里
 
