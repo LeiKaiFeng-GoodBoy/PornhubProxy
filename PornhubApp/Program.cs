@@ -136,7 +136,7 @@ namespace PornhubProxy
 
         static void Main(string[] args)
         {
-            //AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException;
+            AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException;
             //TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
             //RuntimeInformation.IsOSPlatform
 
@@ -160,6 +160,9 @@ namespace PornhubProxy
 
             const string AD_HOST = "adtng.com";
 
+            const string APKMIRROR_HOST = "apkmirror.com";
+           
+            const string UPTODOWN_HOST = "uptodown.com";
 
             var pacListensEndPoint = IPEndPoint.Parse(info.PacServerListen);
             var listenEndPoint = IPEndPoint.Parse(info.ProxyServerListen);
@@ -174,6 +177,8 @@ namespace PornhubProxy
             var mainCert = TLSCertificate.CreateTlsCertificate(ca, PORNHUB_HOST, 2048, 2, PORNHUB_HOST, "*." + PORNHUB_HOST);
             var adCert = TLSCertificate.CreateTlsCertificate(ca, AD_HOST, 2048, 2, AD_HOST, "*." + AD_HOST);
             var hentaiCert = TLSCertificate.CreateTlsCertificate(ca, HENTAI_HOST, 2048, 2, HENTAI_HOST, "*." + HENTAI_HOST);
+            var apkmirrorCert = TLSCertificate.CreateTlsCertificate(ca, APKMIRROR_HOST, 2048, 2, APKMIRROR_HOST, "*." + APKMIRROR_HOST);
+            var uptodownCert = TLSCertificate.CreateTlsCertificate(ca, UPTODOWN_HOST, 2048, 2, UPTODOWN_HOST, "*." + UPTODOWN_HOST, "*.cn." + UPTODOWN_HOST);
 
 
 
@@ -186,7 +191,9 @@ namespace PornhubProxy
                 .Add((host) => PacMethod.dnsDomainIs(host, AD_HOST), ProxyMode.CreateHTTP(pacWriteEndPoint))
                 .Add((host) => host == "i.iwara.tv", ProxyMode.CreateDIRECT())
                 .Add((host) => PacMethod.dnsDomainIs(host, IWARA_HOST), ProxyMode.CreateHTTP(pacWriteEndPoint))
-                .Add((host)=> PacMethod.dnsDomainIs(host, HENTAI_HOST), ProxyMode.CreateHTTP(pacWriteEndPoint))
+                .Add((host) => PacMethod.dnsDomainIs(host, HENTAI_HOST), ProxyMode.CreateHTTP(pacWriteEndPoint))
+                .Add((host) => PacMethod.dnsDomainIs(host, APKMIRROR_HOST), ProxyMode.CreateHTTP(pacWriteEndPoint))
+                .Add((host) => PacMethod.dnsDomainIs(host, UPTODOWN_HOST), ProxyMode.CreateHTTP(pacWriteEndPoint))
                 .StartPACServer();
 
 
@@ -235,11 +242,32 @@ namespace PornhubProxy
             { 
                 CreateLocalStream = ConnectHelper.CreateLocalStream(hentaiCert, SslProtocols.Tls12),
 
-                CreateRemoteStream = ConnectHelper.CreateRemoteStream("104.20.135.21", 443, "104.20.135.21", (s, ssl) => (Stream)ssl, SslProtocols.Tls12)
+                CreateRemoteStream = ConnectHelper.CreateRemoteStream("46.101.100.115", 443, "104.20.135.21", (s, ssl) => (Stream)ssl, SslProtocols.Tls12)
 
             };
 
             var ehentaiAction = TunnelProxy.Create(hentaiInfo);
+
+
+
+            TunnelProxyInfo apkmirrorInfo = new TunnelProxyInfo()
+            {
+                CreateLocalStream = ConnectHelper.CreateLocalStream(apkmirrorCert, SslProtocols.Tls12),
+                CreateRemoteStream = ConnectHelper.CreateRemoteStream("104.19.133.58", 443, "104.19.133.58", (s, ssl) => (Stream)ssl, SslProtocols.None)
+            };
+
+            var apkmirrorAction = TunnelProxy.Create(apkmirrorInfo);
+
+
+
+            TunnelProxyInfo uptodownInfo = new TunnelProxyInfo()
+            {
+                
+                CreateLocalStream = ConnectHelper.CreateLocalStream(uptodownCert, SslProtocols.Tls12),
+                CreateRemoteStream = ConnectHelper.CreateRemoteStream("173.222.18.243", 443, "173.222.18.243", (s, ssl) => (Stream)ssl, SslProtocols.None)
+            };
+
+            var uptodownAction = TunnelProxy.Create(uptodownInfo);
 
 
             var forw = ForwardTunnelRequest.Builder.Create()
@@ -247,6 +275,8 @@ namespace PornhubProxy
                 .Add(PORNHUB_HOST, pornhubAction)
                 .Add(AD_HOST, pornhubAction)
                 .Add(HENTAI_HOST, ehentaiAction)
+                .Add(APKMIRROR_HOST, apkmirrorAction)
+                .Add(UPTODOWN_HOST, uptodownAction)
                 .Get(listenEndPoint);
 
             forw.ListenTask.Wait();
