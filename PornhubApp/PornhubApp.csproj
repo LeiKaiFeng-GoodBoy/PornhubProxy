@@ -20,9 +20,6 @@
     <None Update="Assets\info.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="Assets\myCA.pfx">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
     <None Update="Assets\使用方法.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

@@ -134,6 +134,33 @@ namespace PornhubProxy
 
         }
 
+        static X509Certificate2 GetCA(string basePath, string caName)
+        {
+            string path = Path.Join(basePath, caName);
+            if (File.Exists(path))
+            {
+                return new X509Certificate2(path);
+            }
+
+
+            var ca = TLSCertificate.CreateCA("PornhubApp", 2048, 3000);
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                using X509Store store = new(StoreName.Root, StoreLocation.CurrentUser);
+
+                store.Open(OpenFlags.ReadWrite);
+
+                store.Add(ca);
+            }
+
+
+            File.WriteAllBytes(path, ca.Export(X509ContentType.Pfx));
+
+
+            return ca;
+        }
+
         static void Main(string[] args)
         {
             AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException;
@@ -146,7 +173,7 @@ namespace PornhubProxy
             string basePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets");
 
             byte[] vidoBuffer = File.ReadAllBytes(Path.Combine(basePath, "ad.mp4"));
-            byte[] caCert = File.ReadAllBytes(Path.Combine(basePath, "myCA.pfx"));
+            var ca = GetCA(basePath, "myCA.pfx");
             Info info = JsonSerializer.Deserialize<Info>(File.ReadAllText(Path.Combine(basePath, "info.json"), Encoding.UTF8), new JsonSerializerOptions { ReadCommentHandling = JsonCommentHandling.Skip });
 
 
@@ -173,7 +200,6 @@ namespace PornhubProxy
 
 
 
-            var ca = new X509Certificate2(caCert);
             var mainCert = TLSCertificate.CreateTlsCertificate(ca, PORNHUB_HOST, 2048, 2, PORNHUB_HOST, "*." + PORNHUB_HOST);
             var adCert = TLSCertificate.CreateTlsCertificate(ca, AD_HOST, 2048, 2, AD_HOST, "*." + AD_HOST);
             var hentaiCert = TLSCertificate.CreateTlsCertificate(ca, HENTAI_HOST, 2048, 2, HENTAI_HOST, "*." + HENTAI_HOST);
