@@ -189,7 +189,7 @@ namespace PornhubProxy
 
             const string APKMIRROR_HOST = "apkmirror.com";
            
-            const string UPTODOWN_HOST = "uptodown.com";
+            const string APKPURE_HOST = "apkpure.com";
 
             var pacListensEndPoint = IPEndPoint.Parse(info.PacServerListen);
             var listenEndPoint = IPEndPoint.Parse(info.ProxyServerListen);
@@ -204,7 +204,7 @@ namespace PornhubProxy
             var adCert = TLSCertificate.CreateTlsCertificate(ca, AD_HOST, 2048, 2, AD_HOST, "*." + AD_HOST);
             var hentaiCert = TLSCertificate.CreateTlsCertificate(ca, HENTAI_HOST, 2048, 2, HENTAI_HOST, "*." + HENTAI_HOST);
             var apkmirrorCert = TLSCertificate.CreateTlsCertificate(ca, APKMIRROR_HOST, 2048, 2, APKMIRROR_HOST, "*." + APKMIRROR_HOST);
-            var uptodownCert = TLSCertificate.CreateTlsCertificate(ca, UPTODOWN_HOST, 2048, 2, UPTODOWN_HOST, "*." + UPTODOWN_HOST, "*.cn." + UPTODOWN_HOST);
+            var apkpureCert = TLSCertificate.CreateTlsCertificate(ca, APKPURE_HOST, 2048, 2, APKPURE_HOST, "*." + APKPURE_HOST);
 
 
 
@@ -219,7 +219,7 @@ namespace PornhubProxy
                 .Add((host) => PacMethod.dnsDomainIs(host, IWARA_HOST), ProxyMode.CreateHTTP(pacWriteEndPoint))
                 .Add((host) => PacMethod.dnsDomainIs(host, HENTAI_HOST), ProxyMode.CreateHTTP(pacWriteEndPoint))
                 .Add((host) => PacMethod.dnsDomainIs(host, APKMIRROR_HOST), ProxyMode.CreateHTTP(pacWriteEndPoint))
-                .Add((host) => PacMethod.dnsDomainIs(host, UPTODOWN_HOST), ProxyMode.CreateHTTP(pacWriteEndPoint))
+                .Add((host) => PacMethod.dnsDomainIs(host, APKPURE_HOST), ProxyMode.CreateHTTP(pacWriteEndPoint))
                 .StartPACServer();
 
 
@@ -286,14 +286,15 @@ namespace PornhubProxy
 
 
 
-            TunnelProxyInfo uptodownInfo = new TunnelProxyInfo()
+            TunnelProxyInfo apkpureInfo = new TunnelProxyInfo()
             {
-                
-                CreateLocalStream = ConnectHelper.CreateLocalStream(uptodownCert, SslProtocols.Tls12),
-                CreateRemoteStream = ConnectHelper.CreateRemoteStream("173.222.18.243", 443, "173.222.18.243", (s, ssl) => (Stream)ssl, SslProtocols.None)
+                //https://apkpure.com/
+                //172.67.1.139
+                CreateLocalStream = ConnectHelper.CreateLocalStream(apkpureCert, SslProtocols.Tls12),
+                CreateRemoteStream = ConnectHelper.CreateRemoteStream("172.67.1.139", 443, "172.67.1.139", (s, ssl) => (Stream)ssl, SslProtocols.None)
             };
 
-            var uptodownAction = TunnelProxy.Create(uptodownInfo);
+            var apkpureAction = TunnelProxy.Create(apkpureInfo);
 
 
             var forw = ForwardTunnelRequest.Builder.Create()
@@ -302,7 +303,7 @@ namespace PornhubProxy
                 .Add(AD_HOST, pornhubAction)
                 .Add(HENTAI_HOST, ehentaiAction)
                 .Add(APKMIRROR_HOST, apkmirrorAction)
-                .Add(UPTODOWN_HOST, uptodownAction)
+                .Add(APKPURE_HOST, apkpureAction)
                 .Get(listenEndPoint);
 
             forw.ListenTask.Wait();
