@@ -19,6 +19,7 @@ using System;
 using System.Linq;
 using System.IO;
 using SX = System.Security.Cryptography.X509Certificates;
+using Org.BouncyCastle.OpenSsl;
 
 namespace LeiKaiFeng.X509Certificates
 {
@@ -35,15 +36,15 @@ namespace LeiKaiFeng.X509Certificates
 
         public AsymmetricKeyParameter PrivateKey { get; }
 
-        static CaPack Create(SX.X509Certificate2 certificate)
+        static CaPack CreateCaPack(SX.X509Certificate2 certificate)
         {
 
             var cert = DotNetUtilities.FromX509Certificate(certificate);
 
+            var pri = SX.RSACertificateExtensions.GetRSAPrivateKey(certificate);
 
 
-
-            var key = DotNetUtilities.GetRsaKeyPair(SX.RSACertificateExtensions.GetRSAPrivateKey(certificate)).Private;
+            var key = DotNetUtilities.GetRsaKeyPair(pri).Private;
 
             return new CaPack(cert, key);
 
@@ -51,9 +52,11 @@ namespace LeiKaiFeng.X509Certificates
 
 
 
-        public static CaPack Create(byte[] rawDate)
+        public static CaPack Create(SX.X509Certificate2 certificate2)
         {
-            return Create(new SX.X509Certificate2(rawDate, string.Empty, SX.X509KeyStorageFlags.Exportable));
+            var bytes = certificate2.Export(SX.X509ContentType.Pfx);
+
+            return CreateCaPack(new SX.X509Certificate2(bytes, string.Empty, SX.X509KeyStorageFlags.Exportable));
         }
     }
 
@@ -274,5 +277,43 @@ namespace LeiKaiFeng.X509Certificates
         {
             return GenerateTls(ca, name, keySize, days, subjectNames.Append(subjectName).ToArray());
         }
-    }
+
+
+
+
+        public static class CreatePem
+        {
+
+            static byte[] As(object obj)
+            {
+                MemoryStream memoryStream = new MemoryStream();
+                using (TextWriter tw = new StreamWriter(memoryStream, System.Text.Encoding.ASCII))
+                {
+                    PemWriter pw = new PemWriter(tw);
+
+                    pw.WriteObject(obj);
+
+                    tw.Flush();
+                }
+
+                return memoryStream.ToArray();
+            }
+
+            public static byte[] AsPem(SX.X509Certificate2 certificate2)
+            {
+                return As(DotNetUtilities.FromX509Certificate(certificate2));
+            }
+
+            public static byte[] AsKey(SX.X509Certificate2 certificate2)
+            {
+                var pri = SX.RSACertificateExtensions.GetRSAPrivateKey(certificate2);
+
+
+
+                var keyPair = DotNetUtilities.GetRsaKeyPair(pri).Private;
+
+                return As(keyPair);
+            }
+        }
+    }  
 }

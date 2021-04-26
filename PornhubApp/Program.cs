@@ -143,7 +143,7 @@ namespace PornhubProxy
             }
 
 
-            var ca = TLSCertificate.CreateCA("PornhubApp", 2048, 3000);
+            var ca = TLSCertificate.CreateCA("PornhubApp CA", 2048, 3000);
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
