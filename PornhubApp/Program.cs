@@ -151,11 +151,11 @@ namespace PornhubProxy
 
                 store.Open(OpenFlags.ReadWrite);
 
-                store.Add(ca);
+                store.Add(new X509Certificate2(ca.Export(X509ContentType.Cert)));
             }
 
 
-            File.WriteAllBytes(path, ca.Export(X509ContentType.Pfx));
+            File.WriteAllBytes(path, ca.Export(X509ContentType.Cert));
 
 
             return ca;
