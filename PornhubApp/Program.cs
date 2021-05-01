@@ -155,7 +155,7 @@ namespace PornhubProxy
             }
 
 
-            File.WriteAllBytes(path, ca.Export(X509ContentType.Cert));
+            File.WriteAllBytes(path, ca.Export(X509ContentType.Pfx));
 
 
             return ca;
